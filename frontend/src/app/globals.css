@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-cream: #f5f0e4;
+  --text-ink: #24352b;
+}
+
+body {
+  background-color: var(--bg-cream);
+  color: var(--text-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
