@@ -11,6 +11,7 @@ import {
   StatusBadge,
   formatLiters,
 } from "@/components/ui";
+import { OilTrendChart } from "@/components/CollectionCharts";
 import {
   AlertCircle,
   ArrowRight,
@@ -33,7 +34,7 @@ export default function RTAdminDashboardPage() {
     );
   }
 
-  // FR-06 & Aturan Bisnis #5: Admin RT hanya mengakses data operasional RT yang ditugaskan
+  // FR-06, FR-15 & Aturan Bisnis #5: Admin RT hanya mengakses data & grafik RT yang ditugaskan
   const rtDeposits = deposits.filter((d) => d.rt === currentUser.rt);
 
   const totalVerifiedLiters = rtDeposits
@@ -51,7 +52,7 @@ export default function RTAdminDashboardPage() {
 
   return (
     <div className="space-y-5">
-      {/* Banner Utama & Aksi Cepat Catat Setoran Baru (Mobile-Friendly, Tombol Besar) */}
+      {/* Banner Utama & Aksi Cepat Catat Setoran Baru */}
       <div className="bg-forest text-white rounded-card p-5 sm:p-6 shadow-soft">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -77,7 +78,7 @@ export default function RTAdminDashboardPage() {
         </div>
       </div>
 
-      {/* KPI RT Terkait (Tanpa fitur dana/pembelian/distribusi sesuai FR-06) */}
+      {/* KPI RT Terkait */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <StatCard
           highlight
@@ -105,6 +106,13 @@ export default function RTAdminDashboardPage() {
           icon={<AlertCircle className="w-5 h-5" />}
         />
       </div>
+
+      {/* Grafik Tren Pengumpulan Khusus RT Ini (FR-15 & Bab 10.2) */}
+      <OilTrendChart
+        title={`Grafik Tren Pengumpulan Minyak Jelantah ${currentUser.rt} (Liter)`}
+        subtitle={`Menampilkan volume pengumpulan berstatus Terverifikasi khusus untuk wilayah tanggung jawab ${currentUser.rt} (Harian, Mingguan, Bulanan).`}
+        deposits={rtDeposits}
+      />
 
       {/* Peringatan Catatan Perlu Diperiksa bila ada */}
       {needCheckDeposits.length > 0 && (
@@ -138,7 +146,8 @@ export default function RTAdminDashboardPage() {
               Setoran Terbaru di {currentUser.rt}
             </h2>
             <p className="text-xs text-ink-muted">
-              Hanya menampilkan data warga {currentUser.rt} sesuai batas otorisasi
+              Hanya menampilkan data warga {currentUser.rt} sesuai batas
+              otorisasi
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -213,4 +222,3 @@ export default function RTAdminDashboardPage() {
     </div>
   );
 }
-

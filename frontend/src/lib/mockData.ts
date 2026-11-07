@@ -23,7 +23,8 @@ export const RT_LIST: RTCode[] = [
   "RT 07",
 ];
 
-// Seed akun dasar (1 Super Admin RW, 7 Admin RT, dan contoh akun Warga)
+// Seed akun dasar sesuai FR-01 terbaru:
+// Warga, Admin RT, dan Super Admin membuat PIN sendiri untuk akun yang telah terdaftar di database.
 export const BASE_USERS: UserAccount[] = [
   {
     id: "USR-RW-01",
@@ -32,6 +33,7 @@ export const BASE_USERS: UserAccount[] = [
     role: "SUPER_ADMIN_RW",
     phone: "-",
     active: true,
+    pin: "RW-Berkah1",
     createdAt: "2026-01-01T08:00:00Z",
   },
   ...RT_LIST.map((rt, idx) => ({
@@ -42,6 +44,8 @@ export const BASE_USERS: UserAccount[] = [
     rt,
     phone: "-",
     active: true,
+    // Contoh: Admin RT 07 belum membuat PIN untuk mendemonstrasikan alur Admin RT membuat PIN sendiri saat pertama login
+    pin: idx === 6 ? "" : `AdminRT0${idx + 1}#`,
     createdAt: "2026-01-01T08:00:00Z",
   })),
   {
@@ -52,17 +56,19 @@ export const BASE_USERS: UserAccount[] = [
     rt: "RT 01",
     phone: "-",
     active: true,
+    pin: "WargaA123",
     privacyShowNameInLeaderboard: true,
     createdAt: "2026-01-02T09:00:00Z",
   },
   {
     id: "USR-W-02",
     username: "warga_rt01_b",
-    name: "Warga Contoh B (Ilustratif)",
+    name: "Warga Contoh B (Ilustratif - Belum Buat PIN)",
     role: "WARGA",
     rt: "RT 01",
     phone: "-",
     active: true,
+    pin: "", // Simulasi FR-01: Akun warga terdaftar yang belum membuat PIN sendiri
     privacyShowNameInLeaderboard: false,
     createdAt: "2026-01-02T09:30:00Z",
   },
@@ -74,6 +80,7 @@ export const BASE_USERS: UserAccount[] = [
     rt: "RT 02",
     phone: "-",
     active: true,
+    pin: "WargaC123",
     privacyShowNameInLeaderboard: true,
     createdAt: "2026-01-03T10:00:00Z",
   },
@@ -85,16 +92,16 @@ export const BASE_USERS: UserAccount[] = [
     rt: "RT 03",
     phone: "-",
     active: true,
+    pin: "WargaD123",
     privacyShowNameInLeaderboard: true,
     createdAt: "2026-01-04T10:00:00Z",
   },
 ];
 
-// Titik pengumpulan default tanpa mengarang alamat palsu (Aturan Bisnis #14 & FR-02)
 export const BASE_COLLECTION_POINTS: CollectionPoint[] = RT_LIST.map((rt) => ({
   rt,
   pointName: `Titik Pengumpulan Tetap ${rt}`,
-  address: "", // Belum ditetapkan oleh pengelola (jangan mengarang alamat fiktif)
+  address: "",
   instructions:
     "Saring minyak jelantah dari sisa makanan, masukkan ke jeriken/botol tertutup rapat, dan serahkan langsung ke relawan Admin RT untuk ditakar.",
   operatingHours: "Fleksibel (Datang langsung tanpa jadwal booking)",
@@ -102,7 +109,6 @@ export const BASE_COLLECTION_POINTS: CollectionPoint[] = RT_LIST.map((rt) => ({
   updatedAt: "2026-01-01T08:00:00Z",
 }));
 
-// Data Ilustratif (Hanya ditampilkan saat mode Simulasi Ilustratif aktif, diberi label jelas)
 export const ILLUSTRATIVE_COLLECTION_POINTS: CollectionPoint[] = RT_LIST.map(
   (rt) => ({
     rt,
@@ -133,7 +139,7 @@ export const ILLUSTRATIVE_DEPOSITS: OilDeposit[] = [
   {
     id: "SET-2026-002",
     residentId: "USR-W-02",
-    residentName: "Warga Contoh B (Ilustratif)",
+    residentName: "Warga Contoh B (Ilustratif - Belum Buat PIN)",
     rt: "RT 01",
     volumeLiters: 1.8,
     recordedAt: "2026-10-20T16:10:00Z",
@@ -153,13 +159,13 @@ export const ILLUSTRATIVE_DEPOSITS: OilDeposit[] = [
     recordedById: "USR-RT-01",
     recordedByName: "Relawan Admin RT 01",
     status: "Terverifikasi",
-    notes: "[Data Ilustratif] Setoran rutin bulanan",
+    notes: "[Data Ilustratif] Setoran rutin awal November",
     proofFileName: "bukti_setoran_003_ilustratif.jpg",
   },
   {
     id: "SET-2026-004",
     residentId: "USR-W-02",
-    residentName: "Warga Contoh B (Ilustratif)",
+    residentName: "Warga Contoh B (Ilustratif - Belum Buat PIN)",
     rt: "RT 01",
     volumeLiters: 1.2,
     recordedAt: "2026-11-05T14:20:00Z",
@@ -194,6 +200,19 @@ export const ILLUSTRATIVE_DEPOSITS: OilDeposit[] = [
     status: "Terverifikasi",
     notes: "[Data Ilustratif] Setoran terverifikasi RT 03",
     proofFileName: "bukti_setoran_006_ilustratif.jpg",
+  },
+  {
+    id: "SET-2026-007",
+    residentId: "USR-W-01",
+    residentName: "Warga Contoh A (Ilustratif)",
+    rt: "RT 01",
+    volumeLiters: 2.0,
+    recordedAt: "2026-11-06T09:10:00Z",
+    recordedById: "USR-RT-01",
+    recordedByName: "Relawan Admin RT 01",
+    status: "Terverifikasi",
+    notes: "[Data Ilustratif] Setoran minggu pertama November",
+    proofFileName: "bukti_setoran_007_ilustratif.jpg",
   },
 ];
 
@@ -299,7 +318,8 @@ export const ILLUSTRATIVE_DISTRIBUTIONS: GroceryDistribution[] = [
     location: "Pos Keamanan RW [Data Ilustratif]",
     packageCount: 1,
     recipientCount: 1,
-    recipientNote: "[Data Ilustratif] 1 petugas satpam jaga pagi (1 paket seragam)",
+    recipientNote:
+      "[Data Ilustratif] 1 petugas satpam jaga pagi (1 paket seragam)",
     compositionSnapshot: ILLUSTRATIVE_PACKAGE_COMPOSITION,
     proofFileName: "bukti_distribusi_satpam_001_ilustratif.jpg",
     notes: "[Data Ilustratif] Penyerahan paket sembako seragam",
@@ -329,4 +349,3 @@ export const ILLUSTRATIVE_AUDIT_LOGS: AuditLogEntry[] = [
     reason: "Serah terima 12.0 L dengan berita acara",
   },
 ];
-

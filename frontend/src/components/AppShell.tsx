@@ -48,6 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   } = useApp();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
+  // Bab 7.1 PRD: Navigasi Warga (termasuk Dana Program)
   const wargaNav: NavItem[] = [
     {
       href: "/warga",
@@ -80,6 +81,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       icon: <Award className="w-4 h-4" />,
     },
     {
+      href: "/warga/dana",
+      label: "Dana Program",
+      shortLabel: "Dana",
+      icon: <Coins className="w-4 h-4" />,
+    },
+    {
       href: "/warga/profil",
       label: "Profil",
       shortLabel: "Profil",
@@ -87,6 +94,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     },
   ];
 
+  // Bab 7.2 PRD: Navigasi Admin RT (termasuk Dana Program)
   const rtNav: NavItem[] = [
     {
       href: "/rt",
@@ -113,13 +121,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       icon: <BarChart3 className="w-4 h-4" />,
     },
     {
+      href: "/rt/dana",
+      label: "Dana Program",
+      shortLabel: "Dana",
+      icon: <Coins className="w-4 h-4" />,
+    },
+    {
       href: "/rt/profil",
-      label: "Profil & Titik RT",
+      label: "Profil",
       shortLabel: "Profil",
       icon: <User className="w-4 h-4" />,
     },
   ];
 
+  // Bab 7.3 PRD: Navigasi Super Admin RW
   const rwNav: NavItem[] = [
     {
       href: "/rw",
@@ -202,7 +217,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-cream text-ink">
-      {/* Banner Prototipe & Switcher Peran — Responsif di HP, Tablet, Laptop, PC */}
+      {/* Banner Prototipe & Switcher Peran */}
       <div className="bg-forest-dark text-white text-xs border-b border-white/10 px-3 sm:px-6 py-2">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -287,7 +302,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </span>
                 </div>
                 <p className="text-[11px] text-ink-muted hidden sm:block">
-                  Program Sosial Lingkungan RW (7 RT) • Tanpa Transaksi Uang ke Warga
+                  Program Sosial Lingkungan RW (7 RT) • Tanpa Transaksi Uang ke
+                  Warga
                 </p>
               </div>
             </Link>
@@ -313,9 +329,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Main Layout Container: Sidebar di Laptop/PC, Full-width fleksibel di HP/Tablet */}
+      {/* Main Layout Container */}
       <div className="flex-1 max-w-7xl w-full mx-auto flex flex-col lg:flex-row gap-0 lg:gap-6 px-3 sm:px-6 pt-4 pb-24 lg:pb-10">
-        {/* Sidebar Desktop (Laptop & PC) */}
+        {/* Sidebar Desktop */}
         <aside className="hidden lg:block w-64 shrink-0">
           <div className="sticky top-20 bg-white rounded-card border border-line shadow-soft p-3 space-y-1">
             <div className="px-3 py-2 border-b border-line mb-2">
@@ -351,9 +367,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 Prinsip Program
               </p>
               <p className="text-[11px] text-ink-muted mt-1 leading-relaxed">
-                Hanya mengelola sedekah minyak jelantah (Liter). Hasil penyerahan
-                ke Dinas Kebersihan Kota Bekasi disalurkan menjadi paket sembako
-                seragam bagi satpam.
+                Hanya mengelola sedekah minyak jelantah (Liter). Hasil
+                penyerahan ke Dinas Kebersihan Kota Bekasi disalurkan menjadi
+                paket sembako seragam bagi satpam.
               </p>
             </div>
           </div>
@@ -422,16 +438,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 min-w-0 space-y-5">{children}</main>
       </div>
 
-      {/* Bottom Navigation Bar untuk Layar HP/Mobile (Warga, Admin RT, dan Super Admin) */}
+      {/* Bottom Navigation Bar untuk Layar HP/Mobile */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-line px-1.5 py-1.5">
-        <div className="grid grid-cols-5 gap-1 max-w-md mx-auto">
-          {activeNav.slice(0, 5).map((item) => {
+        <div className="grid grid-cols-6 gap-1 max-w-lg mx-auto">
+          {activeNav.slice(0, 6).map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[11px] font-medium transition ${
+                className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-medium transition ${
                   isActive
                     ? "bg-forest text-white"
                     : "text-ink-muted hover:text-forest"
@@ -449,4 +465,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-

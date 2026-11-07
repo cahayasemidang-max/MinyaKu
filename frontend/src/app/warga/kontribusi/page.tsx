@@ -2,14 +2,9 @@
 
 import React from "react";
 import { useApp } from "@/context/AppContext";
-import {
-  Card,
-  EmptyState,
-  RoleDeniedBanner,
-  StatCard,
-  formatLiters,
-} from "@/components/ui";
-import { BarChart3, CheckCircle2, Clock, Droplets } from "lucide-react";
+import { RoleDeniedBanner, StatCard, formatLiters } from "@/components/ui";
+import { OilTrendChart } from "@/components/CollectionCharts";
+import { CheckCircle2, Clock, Droplets } from "lucide-react";
 
 export default function ResidentContributionPage() {
   const { currentUser, deposits } = useApp();
@@ -40,22 +35,6 @@ export default function ResidentContributionPage() {
     0
   );
 
-  // Rekap tren per bulan (hanya dari setoran Terverifikasi sesuai FR-05)
-  const monthlyMap = new Map<string, number>();
-  verifiedDeposits.forEach((d) => {
-    const ym = d.recordedAt.slice(0, 7); // YYYY-MM
-    monthlyMap.set(ym, (monthlyMap.get(ym) || 0) + d.volumeLiters);
-  });
-
-  const monthlyTrend = Array.from(monthlyMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, liters]) => ({
-      month,
-      liters: Number(liters.toFixed(2)),
-    }));
-
-  const maxMonthLiters = Math.max(...monthlyTrend.map((m) => m.liters), 1);
-
   return (
     <div className="space-y-5">
       <div>
@@ -63,8 +42,9 @@ export default function ResidentContributionPage() {
           Kontribusi Minyak Jelantah Saya
         </h1>
         <p className="text-xs sm:text-sm text-ink-muted mt-1">
-          Sesuai Aturan Bisnis #13 & FR-05: Total kontribusi final hanya
-          menjumlahkan setoran yang berstatus <strong>Terverifikasi</strong>.
+          Sesuai Aturan Bisnis #13, FR-05 & FR-15: Total kontribusi dan grafik
+          tren hanya menjumlahkan setoran yang berstatus{" "}
+          <strong>Terverifikasi</strong> dalam satuan Liter (L).
         </p>
       </div>
 
@@ -94,56 +74,12 @@ export default function ResidentContributionPage() {
         />
       </div>
 
-      {/* Tren Kontribusi per Periode */}
-      <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <BarChart3 className="w-5 h-5 text-forest" />
-          <div>
-            <h2 className="text-sm sm:text-base font-bold text-forest">
-              Tren Kontribusi Terverifikasi per Bulan
-            </h2>
-            <p className="text-xs text-ink-muted">
-              Visualisasi volume minyak jelantah terverifikasi yang telah Anda
-              sedekahkan
-            </p>
-          </div>
-        </div>
-
-        {monthlyTrend.length === 0 ? (
-          <EmptyState
-            title="Belum Ada Data Tren Kontribusi"
-            description="Tren bulanan akan muncul setelah Anda memiliki setoran berstatus Terverifikasi."
-          />
-        ) : (
-          <div className="space-y-3">
-            {monthlyTrend.map((item) => {
-              const pct = Math.min(
-                100,
-                Math.round((item.liters / maxMonthLiters) * 100)
-              );
-              return (
-                <div key={item.month} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs sm:text-sm">
-                    <span className="font-semibold text-ink">
-                      Periode {item.month}
-                    </span>
-                    <span className="font-bold text-forest">
-                      {formatLiters(item.liters)}
-                    </span>
-                  </div>
-                  <div className="w-full h-3 bg-cream rounded-full overflow-hidden border border-line">
-                    <div
-                      className="h-full bg-forest rounded-full transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+      {/* Grafik Tren Kontribusi Pribadi (Harian, Mingguan, Bulanan + Filter Rentang Tanggal) */}
+      <OilTrendChart
+        title="Grafik Tren Kontribusi Pribadi (Harian / Mingguan / Bulanan)"
+        subtitle="Pantau perkembangan volume minyak jelantah terverifikasi yang telah Anda sedekahkan berdasarkan rentang tanggal."
+        deposits={myDeposits}
+      />
     </div>
   );
 }
-

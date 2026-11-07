@@ -3,16 +3,29 @@
 import React, { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { Card, RoleDeniedBanner } from "@/components/ui";
-import { CheckCircle2, Save, Shield, User } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  KeyRound,
+  Save,
+  Shield,
+  User,
+} from "lucide-react";
 
 export default function ResidentProfilePage() {
-  const { currentUser, updateResidentProfile } = useApp();
+  const { currentUser, updateResidentProfile, changeOwnPin } = useApp();
   const [name, setName] = useState(currentUser.name);
   const [phone, setPhone] = useState(currentUser.phone || "");
   const [showInLeaderboard, setShowInLeaderboard] = useState(
     currentUser.privacyShowNameInLeaderboard ?? true
   );
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  // State Ganti PIN (FR-01)
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [pinError, setPinError] = useState<string | null>(null);
 
   if (currentUser.role !== "WARGA") {
     return (
@@ -23,7 +36,7 @@ export default function ResidentProfilePage() {
     );
   }
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     const res = updateResidentProfile({
       name,
@@ -36,15 +49,34 @@ export default function ResidentProfilePage() {
     }
   };
 
+  const handleChangePin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError(null);
+    if (newPin !== confirmPin) {
+      setPinError("Konfirmasi PIN baru tidak cocok.");
+      return;
+    }
+    const res = changeOwnPin(currentPin, newPin);
+    if (!res.ok) {
+      setPinError(res.message);
+      return;
+    }
+    setFeedback(res.message);
+    setCurrentPin("");
+    setNewPin("");
+    setConfirmPin("");
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
   return (
     <div className="max-w-2xl space-y-5">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-forest">
-          Profil & Privasi Warga
+          Profil, Privasi & Pengaturan PIN Warga
         </h1>
         <p className="text-xs sm:text-sm text-ink-muted mt-1">
-          Kelola informasi profil yang diizinkan dan pengaturan tampil nama pada
-          Leaderboard (Bab 5.1 PRD).
+          Kelola informasi profil, pengaturan privasi nama pada Leaderboard, dan
+          ganti PIN pribadi Anda (Bab 5.1 & FR-01 PRD).
         </p>
       </div>
 
@@ -56,16 +88,19 @@ export default function ResidentProfilePage() {
       )}
 
       <Card>
-        <form onSubmit={handleSave} className="space-y-4">
+        <h2 className="text-base font-bold text-forest mb-4">
+          Informasi Profil & Privasi
+        </h2>
+        <form onSubmit={handleSaveProfile} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-ink-muted mb-1">
-                ID Akun Warga
+                ID Akun Warga Terdaftar
               </label>
               <input
                 type="text"
                 disabled
-                value={currentUser.id}
+                value={`${currentUser.id} (@${currentUser.username})`}
                 className="w-full rounded-xl border border-line bg-cream/60 px-3.5 py-2 text-sm text-ink-muted"
               />
             </div>
@@ -142,7 +177,86 @@ export default function ResidentProfilePage() {
           </button>
         </form>
       </Card>
+
+      {/* Fitur Ganti PIN Warga (FR-01) */}
+      <Card>
+        <div className="flex items-center gap-2 mb-3">
+          <KeyRound className="w-5 h-5 text-forest" />
+          <div>
+            <h2 className="text-base font-bold text-forest">
+              Pengaturan / Ganti PIN Akun Warga (FR-01)
+            </h2>
+            <p className="text-xs text-ink-muted">
+              Warga dapat membuat dan mengganti PIN sendiri (bebas kombinasi
+              karakter & angka).
+            </p>
+          </div>
+        </div>
+
+        {pinError && (
+          <div className="mb-3 p-3 rounded-xl bg-red-50 border border-red-300 text-red-900 text-xs font-medium flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {pinError}
+          </div>
+        )}
+
+        <form onSubmit={handleChangePin} className="space-y-3">
+          {currentUser.pin && (
+            <div>
+              <label className="block text-xs font-semibold text-ink mb-1">
+                PIN Saat Ini <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Masukkan PIN saat ini..."
+                value={currentPin}
+                onChange={(e) => setCurrentPin(e.target.value)}
+                className="w-full rounded-xl border border-line px-3.5 py-2 text-sm"
+              />
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-ink mb-1">
+                PIN Baru (Bebas Karakter & Angka){" "}
+                <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Masukkan PIN baru..."
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value)}
+                className="w-full rounded-xl border border-line px-3.5 py-2 text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-ink mb-1">
+                Konfirmasi PIN Baru <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Ulangi PIN baru..."
+                value={confirmPin}
+                onChange={(e) => setConfirmPin(e.target.value)}
+                className="w-full rounded-xl border border-line px-3.5 py-2 text-sm"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-forest hover:bg-forest-dark text-white text-xs sm:text-sm font-semibold transition"
+          >
+            <KeyRound className="w-4 h-4" />
+            Perbarui PIN Saya
+          </button>
+        </form>
+      </Card>
     </div>
   );
 }
-

@@ -4,13 +4,12 @@ import React from "react";
 import Link from "next/link";
 import { useApp } from "@/context/AppContext";
 import {
-  Card,
   RoleDeniedBanner,
   StatCard,
   formatLiters,
   formatRp,
 } from "@/components/ui";
-import { RT_LIST } from "@/lib/mockData";
+import { OilTrendChart, RTComparisonChart } from "@/components/CollectionCharts";
 import {
   ArrowRight,
   BarChart3,
@@ -35,28 +34,6 @@ export default function RWSuperAdminDashboardPage() {
     );
   }
 
-  // Perbandingan pengumpulan antar 7 RT (FR-07)
-  const rtComparison = RT_LIST.map((rt) => {
-    const rtDeps = deposits.filter((d) => d.rt === rt);
-    const verifiedLiters = rtDeps
-      .filter((d) => d.status === "Terverifikasi")
-      .reduce((acc, d) => acc + d.volumeLiters, 0);
-    const needCheckCount = rtDeps.filter(
-      (d) => d.status === "Perlu diperiksa"
-    ).length;
-    return {
-      rt,
-      verifiedLiters: Number(verifiedLiters.toFixed(2)),
-      totalRecords: rtDeps.length,
-      needCheckCount,
-    };
-  });
-
-  const maxRtLiters = Math.max(
-    ...rtComparison.map((r) => r.verifiedLiters),
-    1
-  );
-
   return (
     <div className="space-y-5">
       {/* Header Ringkasan Super Admin RW */}
@@ -72,7 +49,8 @@ export default function RWSuperAdminDashboardPage() {
             <p className="text-xs sm:text-sm text-cream/90 mt-1 max-w-3xl">
               Memisahkan secara tegas volume minyak terkumpul vs diserahkan ke
               Dinas Kebersihan Kota Bekasi, serta memisahkan dana masuk,
-              pengeluaran pembelian sembako, dan saldo dana tercatat (FR-07).
+              pengeluaran pembelian sembako, dan saldo dana tercatat (FR-07 &
+              FR-15).
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -92,7 +70,7 @@ export default function RWSuperAdminDashboardPage() {
         </div>
       </div>
 
-      {/* Blok 1: KPI Stok & Volume Minyak Jelantah (Aturan Bisnis #11 & Bab 9.1) */}
+      {/* Blok 1: KPI Stok & Volume Minyak Jelantah */}
       <div>
         <div className="flex items-center justify-between mb-2.5">
           <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-forest">
@@ -134,7 +112,7 @@ export default function RWSuperAdminDashboardPage() {
         </div>
       </div>
 
-      {/* Blok 2: KPI Keuangan Program (Aturan Bisnis #12 & FR-09 — Saldo bukan label keuntungan) */}
+      {/* Blok 2: KPI Keuangan Program */}
       <div>
         <div className="flex items-center justify-between mb-2.5">
           <h2 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-forest">
@@ -205,62 +183,16 @@ export default function RWSuperAdminDashboardPage() {
         </div>
       </div>
 
-      {/* Perbandingan Pengumpulan Antar-7 RT */}
-      <Card>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-          <div>
-            <h2 className="text-sm sm:text-base font-bold text-forest">
-              Perbandingan Volume Terverifikasi Antar-RT (RT 01 s/d RT 07)
-            </h2>
-            <p className="text-xs text-ink-muted">
-              Pantau capaian setiap titik pengumpulan RT dan catatan yang perlu
-              diperiksa
-            </p>
-          </div>
-          <Link
-            href="/rw/laporan"
-            className="text-xs font-bold text-forest hover:underline"
-          >
-            Buka Laporan Lengkap →
-          </Link>
-        </div>
+      {/* Grafik 1: Tren Pengumpulan Seluruh RW dengan Filter Harian/Mingguan/Bulanan, Rentang Tanggal & RT (FR-15) */}
+      <OilTrendChart
+        title="Grafik Tren Pengumpulan Minyak Jelantah Tingkat RW (Liter)"
+        subtitle="Pantau perkembangan volume minyak jelantah terverifikasi seluruh RW atau per RT berdasarkan periode Harian, Mingguan, dan Bulanan (Tanpa dicampur dengan volume penyerahan ke dinas)."
+        deposits={deposits}
+        allowRTFilter={true}
+      />
 
-        <div className="space-y-3">
-          {rtComparison.map((row) => {
-            const pct = Math.min(
-              100,
-              Math.round((row.verifiedLiters / maxRtLiters) * 100)
-            );
-            return (
-              <div key={row.rt} className="space-y-1">
-                <div className="flex flex-wrap items-center justify-between text-xs sm:text-sm gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-ink w-14">{row.rt}</span>
-                    <span className="text-xs text-ink-muted">
-                      ({row.totalRecords} catatan)
-                    </span>
-                    {row.needCheckCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[11px] font-semibold">
-                        {row.needCheckCount} perlu diperiksa
-                      </span>
-                    )}
-                  </div>
-                  <span className="font-bold text-forest">
-                    {formatLiters(row.verifiedLiters)}
-                  </span>
-                </div>
-                <div className="w-full h-3 bg-cream rounded-full overflow-hidden border border-line">
-                  <div
-                    className="h-full bg-forest rounded-full transition-all"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
+      {/* Grafik 2: Perbandingan Volume Pengumpulan Antar-7 RT dengan Filter Rentang Tanggal (FR-15) */}
+      <RTComparisonChart deposits={deposits} />
     </div>
   );
 }
-

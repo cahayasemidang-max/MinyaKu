@@ -22,6 +22,13 @@ export interface UserAccount {
   rt?: RTCode; // Required for WARGA and ADMIN_RT
   phone?: string;
   active: boolean;
+  /**
+   * FR-01:
+   * Seluruh akun (Warga, Admin RT, dan Super Admin) telah terdaftar di database.
+   * Masing-masing pengguna (Warga, Admin RT, Super Admin) membuat PIN sendiri
+   * untuk akun yang telah terdaftar (bebas campuran karakter dan angka).
+   */
+  pin?: string;
   privacyShowNameInLeaderboard?: boolean;
   createdAt: string;
 }
@@ -29,7 +36,7 @@ export interface UserAccount {
 export interface CollectionPoint {
   rt: RTCode;
   pointName: string;
-  address: string; // Kosong secara default jika belum diisi pengelola (jangan mengarang alamat nyata)
+  address: string;
   instructions: string;
   operatingHours: string;
   coordinatorName: string;
@@ -47,7 +54,7 @@ export interface OilDeposit {
   recordedByName: string;
   status: DepositStatus;
   notes?: string;
-  proofFileName: string; // Wajib foto bukti sesuai keputusan
+  proofFileName: string;
   proofUrl?: string;
 }
 
@@ -56,12 +63,12 @@ export type HandoverFundStatus = "Belum Diterima" | "Sudah Diterima";
 export interface AgencyHandover {
   id: string;
   handoverDate: string;
-  agencyName: string; // Default: Dinas Kebersihan Kota Bekasi
+  agencyName: string;
   volumeLiters: number;
   fundStatus: HandoverFundStatus;
-  fundReceivedRp: number; // 0 jika belum diterima
+  fundReceivedRp: number;
   fundReceivedDate?: string;
-  proofFileName: string; // Wajib bukti serah terima / transaksi
+  proofFileName: string;
   notes?: string;
   recordedBy: string;
 }
@@ -70,7 +77,7 @@ export interface StockAdjustment {
   id: string;
   date: string;
   type: "Tumpahan / Susut" | "Koreksi Pengukuran";
-  volumeDeltaLiters: number; // negatif jika mengurangi stok
+  volumeDeltaLiters: number;
   reason: string;
   recordedBy: string;
 }
@@ -88,7 +95,7 @@ export interface FinanceTransaction {
     | "Koreksi Tercatat";
   amountRp: number;
   description: string;
-  referenceId?: string; // ID serah terima atau ID pembelian sembako
+  referenceId?: string;
   proofFileName: string;
   recordedBy: string;
   correctionReason?: string;
@@ -97,7 +104,7 @@ export interface FinanceTransaction {
 export interface GroceryPurchaseItem {
   itemName: string;
   quantity: number;
-  unit: string; // kg, liter, kantong, kaleng, bungkus
+  unit: string;
   unitPriceRp: number;
   totalPriceRp: number;
 }
@@ -108,8 +115,8 @@ export interface GroceryPurchase {
   supplierName: string;
   items: GroceryPurchaseItem[];
   totalTransactionRp: number;
-  receivedConfirmed: boolean; // Hanya masuk stok jika dikonfirmasi diterima
-  proofFileName: string; // Wajib foto nota
+  receivedConfirmed: boolean;
+  proofFileName: string;
   notes?: string;
   recordedBy: string;
 }
@@ -143,10 +150,10 @@ export interface GroceryDistribution {
   distributionDate: string;
   location: string;
   packageCount: number;
-  recipientCount: number; // Jumlah satpam penerima (masing-masing 1 paket seragam)
-  recipientNote: string; // Catatan penerima / pos satpam
-  compositionSnapshot: PackageCompositionItem[]; // Snapshot agar perubahan komposisi masa depan tidak mengubah historis
-  proofFileName: string; // Wajib foto bukti distribusi
+  recipientCount: number;
+  recipientNote: string;
+  compositionSnapshot: PackageCompositionItem[];
+  proofFileName: string;
   notes?: string;
   recordedBy: string;
 }
@@ -161,4 +168,3 @@ export interface AuditLogEntry {
   targetId: string;
   reason: string;
 }
-

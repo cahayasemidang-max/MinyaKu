@@ -62,7 +62,6 @@ interface AppContextValue {
   distributions: GroceryDistribution[];
   auditLogs: AuditLogEntry[];
 
-  // Perhitungan terpusat sesuai Bab 9 PRD
   metrics: {
     totalVerifiedVolumeAllRT: number;
     totalHandedOverVolume: number;
@@ -77,7 +76,22 @@ interface AppContextValue {
     estimatedCostPerPackageRp: number;
   };
 
-  // Aksi Bisnis dengan Validasi Peran & Audit Log
+  // FR-01: Autentikasi & Pengelolaan PIN (Warga, Admin RT, dan Super Admin membuat & mengganti PIN sendiri)
+  authenticateWithPin: (
+    userId: string,
+    pinInput: string
+  ) => { ok: boolean; message: string; user?: UserAccount };
+
+  createSelfPin: (
+    userId: string,
+    newPin: string
+  ) => { ok: boolean; message: string; user?: UserAccount };
+
+  changeOwnPin: (
+    currentPin: string,
+    newPin: string
+  ) => { ok: boolean; message: string };
+
   recordDeposit: (input: {
     residentId: string;
     volumeLiters: number;
@@ -125,10 +139,10 @@ interface AppContextValue {
     date: string;
     type: "DANA_MASUK" | "PENGELUARAN";
     category:
-    | "Penerimaan Dinas Kebersihan"
-    | "Pembelian Sembako"
-    | "Operasional Penunjang"
-    | "Koreksi Tercatat";
+      | "Penerimaan Dinas Kebersihan"
+      | "Pembelian Sembako"
+      | "Operasional Penunjang"
+      | "Koreksi Tercatat";
     amountRp: number;
     description: string;
     proofFileName: string;
@@ -181,7 +195,7 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
-const STORAGE_KEY = "jelantah_berkah_state_v1";
+const STORAGE_KEY = "jelantah_berkah_state_v3";
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isIllustrativeMode, setIsIllustrativeMode] = useState<boolean>(true);
@@ -295,13 +309,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return users.find((u) => u.id === currentUserId) || users[0];
   }, [users, currentUserId]);
 
-  const appendAudit = (action: string, targetId: string, reason: string) => {
+  const appendAudit = (
+    action: string,
+    targetId: string,
+    reason: string,
+    actorOverride?: UserAccount
+  ) => {
+    const actor = actorOverride || currentUser;
     const newEntry: AuditLogEntry = {
       id: `AUD-${Date.now().toString().slice(-5)}`,
       timestamp: new Date().toISOString(),
-      actorId: currentUser.id,
-      actorName: currentUser.name,
-      actorRole: currentUser.role,
+      actorId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role,
       action,
       targetId,
       reason,
@@ -324,7 +344,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setDistributions(ILLUSTRATIVE_DISTRIBUTIONS);
       setAuditLogs(ILLUSTRATIVE_AUDIT_LOGS);
     } else {
-      // Seed Data Kosong: 1 Super Admin, 7 Admin RT, tanpa data fiktif (Aturan Bisnis #14)
       const cleanUsers = BASE_USERS.filter((u) => u.role !== "WARGA");
       setUsers(cleanUsers);
       if (currentUser.role === "WARGA") {
@@ -347,7 +366,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     toggleDataMode(isIllustrativeMode);
   };
 
-  // Perhitungan Operasional & Keuangan sesuai Bab 9 PRD
   const metrics = useMemo(() => {
     const totalVerifiedVolumeAllRT = Number(
       deposits
@@ -366,7 +384,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .toFixed(2)
     );
 
-    // Rumus 9.1: Sisa volume tercatat = volume masuk diakui stok (Terverifikasi) - volume keluar penyerahan + penyesuaian sah
     const remainingRecordedVolume = Number(
       (
         totalVerifiedVolumeAllRT -
@@ -383,11 +400,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .filter((t) => t.type === "PENGELUARAN")
       .reduce((acc, t) => acc + t.amountRp, 0);
 
-    // Rumus FR-09: Saldo dana tercatat = total dana masuk tercatat - total pengeluaran tercatat
     const recordedFundBalanceRp =
       totalFundsReceivedRp - totalProgramExpensesRp;
 
-    // Hitung inventaris per item dari pembelian yang sudah dikonfirmasi diterima dikurangi distribusi historis
     const itemMap = new Map<
       string,
       {
@@ -399,7 +414,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     >();
 
-    // Pastikan semua item dalam komposisi standar terdaftar di map
     packageComposition.forEach((comp) => {
       const key = `${comp.itemName.toLowerCase()}__${comp.unit.toLowerCase()}`;
       if (!itemMap.has(key)) {
@@ -489,10 +503,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       packageComposition.length === 0 || compositionItemsSummary.length === 0
         ? 0
         : Math.min(
-          ...compositionItemsSummary.map(
-            (i) => i.maxPackagesFromThisItem ?? 0
-          )
-        );
+            ...compositionItemsSummary.map(
+              (i) => i.maxPackagesFromThisItem ?? 0
+            )
+          );
 
     const inventorySummary = rawInventory.map((item) => ({
       ...item,
@@ -545,7 +559,114 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // FR-03: Pencatatan setoran minyak jelantah (Admin RT langsung memverifikasi saat mencatat)
+  // FR-01: Validasi login menggunakan PIN masing-masing akun
+  const authenticateWithPin: AppContextValue["authenticateWithPin"] = (
+    userId,
+    pinInput
+  ) => {
+    const target = users.find((u) => u.id === userId);
+    if (!target) {
+      return { ok: false, message: "Akun tidak ditemukan di database." };
+    }
+    if (!target.active) {
+      return {
+        ok: false,
+        message: "Akun ini sedang dinonaktifkan oleh Super Admin RW.",
+      };
+    }
+    if (!target.pin) {
+      return {
+        ok: false,
+        message:
+          "Akun ini belum memiliki PIN. Silakan buat PIN pribadi terlebih dahulu.",
+      };
+    }
+    if (target.pin !== pinInput) {
+      return {
+        ok: false,
+        message:
+          "PIN yang Anda masukkan tidak sesuai dengan akun yang dipilih.",
+      };
+    }
+    setCurrentUserId(target.id);
+    return {
+      ok: true,
+      message: `Selamat datang, ${target.name}.`,
+      user: target,
+    };
+  };
+
+  // FR-01: Warga, Admin RT, dan Super Admin membuat PIN sendiri pada akun yang telah terdaftar
+  const createSelfPin: AppContextValue["createSelfPin"] = (userId, newPin) => {
+    const trimmed = newPin.trim();
+    if (!trimmed) {
+      return {
+        ok: false,
+        message: "PIN tidak boleh kosong (bebas menggunakan karakter & angka).",
+      };
+    }
+    const target = users.find((u) => u.id === userId);
+    if (!target) {
+      return { ok: false, message: "Akun tidak ditemukan." };
+    }
+
+    const updatedUser: UserAccount = {
+      ...target,
+      pin: trimmed,
+    };
+
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? updatedUser : u))
+    );
+    setCurrentUserId(target.id);
+    appendAudit(
+      "Membuat PIN mandiri pada akun terdaftar",
+      target.id,
+      `${target.name} (${target.role}) menetapkan PIN pribadi`,
+      updatedUser
+    );
+    return {
+      ok: true,
+      message: "PIN pribadi berhasil dibuat. Anda kini masuk ke aplikasi.",
+      user: updatedUser,
+    };
+  };
+
+  // FR-01: Semua role memiliki fitur untuk mengganti PIN
+  const changeOwnPin: AppContextValue["changeOwnPin"] = (
+    currentPin,
+    newPin
+  ) => {
+    if (currentUser.pin && currentUser.pin !== currentPin) {
+      return {
+        ok: false,
+        message: "PIN saat ini yang Anda masukkan tidak sesuai.",
+      };
+    }
+    const trimmed = newPin.trim();
+    if (!trimmed) {
+      return {
+        ok: false,
+        message:
+          "PIN baru tidak boleh kosong (bebas campuran karakter & angka).",
+      };
+    }
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === currentUser.id ? { ...u, pin: trimmed } : u
+      )
+    );
+    appendAudit(
+      "Mengganti PIN akun pribadi",
+      currentUser.id,
+      `${currentUser.name} (${currentUser.role}) memperbarui PIN keamanan`
+    );
+    return {
+      ok: true,
+      message: "PIN pribadi Anda berhasil diperbarui.",
+    };
+  };
+
   const recordDeposit: AppContextValue["recordDeposit"] = (input) => {
     if (
       currentUser.role !== "ADMIN_RT" &&
@@ -553,7 +674,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ) {
       return {
         ok: false,
-        message: "Akses ditolak: Hanya Admin RT atau Super Admin yang berwenang mencatat setoran.",
+        message:
+          "Akses ditolak: Hanya Admin RT atau Super Admin yang berwenang mencatat setoran.",
       };
     }
 
@@ -564,7 +686,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { ok: false, message: "Warga penyetor tidak ditemukan." };
     }
 
-    // Validasi otorisasi per RT (Aturan Bisnis #5 & #15)
     if (
       currentUser.role === "ADMIN_RT" &&
       currentUser.rt !== resident.rt
@@ -598,7 +719,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       recordedAt: new Date().toISOString(),
       recordedById: currentUser.id,
       recordedByName: currentUser.name,
-      status: input.status ?? "Terverifikasi", // Keputusan A3: Admin RT langsung memverifikasi saat mencatat
+      status: input.status ?? "Terverifikasi",
       notes: input.notes?.trim() || undefined,
       proofFileName: input.proofFileName.trim(),
     };
@@ -672,7 +793,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ) {
       return {
         ok: false,
-        message: "Anda tidak berwenang mengubah informasi titik pengumpulan ini.",
+        message:
+          "Anda tidak berwenang mengubah informasi titik pengumpulan ini.",
       };
     }
     setCollectionPoints((prev) =>
@@ -699,11 +821,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (currentUser.role !== "SUPER_ADMIN_RW") {
       return {
         ok: false,
-        message: "Hanya Super Admin RW yang dapat mencatat penyerahan ke dinas.",
+        message:
+          "Hanya Super Admin RW yang dapat mencatat penyerahan ke dinas.",
       };
     }
     if (input.volumeLiters <= 0) {
-      return { ok: false, message: "Volume penyerahan harus lebih dari 0 liter." };
+      return {
+        ok: false,
+        message: "Volume penyerahan harus lebih dari 0 liter.",
+      };
     }
     if (!input.proofFileName.trim()) {
       return {
@@ -747,7 +873,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     if (input.fundStatus === "Sudah Diterima" && input.fundReceivedRp > 0) {
       const finEntry: FinanceTransaction = {
-        id: `FIN-2026-${String(financeTransactions.length + 1).padStart(3, "0")}`,
+        id: `FIN-2026-${String(financeTransactions.length + 1).padStart(
+          3,
+          "0"
+        )}`,
         date: input.handoverDate,
         type: "DANA_MASUK",
         category: "Penerimaan Dinas Kebersihan",
@@ -778,34 +907,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: "Akses ditolak." };
       }
       if (amountRp <= 0) {
-        return { ok: false, message: "Nominal dana diterima harus lebih dari Rp 0." };
+        return {
+          ok: false,
+          message: "Nominal dana diterima harus lebih dari Rp 0.",
+        };
       }
       if (!proofFileName.trim()) {
-        return { ok: false, message: "Foto bukti penerimaan dana wajib dilampirkan." };
+        return {
+          ok: false,
+          message: "Foto bukti penerimaan dana wajib dilampirkan.",
+        };
       }
       const target = handovers.find((h) => h.id === handoverId);
       if (!target) {
         return { ok: false, message: "Data penyerahan tidak ditemukan." };
       }
       if (target.fundStatus === "Sudah Diterima") {
-        return { ok: false, message: "Dana untuk penyerahan ini sudah tercatat sebelumnya." };
+        return {
+          ok: false,
+          message: "Dana untuk penyerahan ini sudah tercatat sebelumnya.",
+        };
       }
 
       setHandovers((prev) =>
         prev.map((h) =>
           h.id === handoverId
             ? {
-              ...h,
-              fundStatus: "Sudah Diterima",
-              fundReceivedRp: amountRp,
-              fundReceivedDate: receivedDate,
-            }
+                ...h,
+                fundStatus: "Sudah Diterima",
+                fundReceivedRp: amountRp,
+                fundReceivedDate: receivedDate,
+              }
             : h
         )
       );
 
       const finEntry: FinanceTransaction = {
-        id: `FIN-2026-${String(financeTransactions.length + 1).padStart(3, "0")}`,
+        id: `FIN-2026-${String(financeTransactions.length + 1).padStart(
+          3,
+          "0"
+        )}`,
         date: receivedDate,
         type: "DANA_MASUK",
         category: "Penerimaan Dinas Kebersihan",
@@ -823,7 +964,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
       return {
         ok: true,
-        message: `Dana sebesar Rp ${amountRp.toLocaleString("id-ID")} berhasil dicatat masuk ke Dana Program.`,
+        message: `Dana sebesar Rp ${amountRp.toLocaleString(
+          "id-ID"
+        )} berhasil dicatat masuk ke Dana Program.`,
       };
     };
 
@@ -862,10 +1005,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return { ok: false, message: "Akses ditolak." };
       }
       if (input.amountRp <= 0) {
-        return { ok: false, message: "Nominal transaksi harus lebih dari Rp 0." };
+        return {
+          ok: false,
+          message: "Nominal transaksi harus lebih dari Rp 0.",
+        };
       }
       if (!input.proofFileName.trim()) {
-        return { ok: false, message: "Foto bukti transaksi wajib dilampirkan." };
+        return {
+          ok: false,
+          message: "Foto bukti transaksi wajib dilampirkan.",
+        };
       }
       if (
         input.category === "Koreksi Tercatat" &&
@@ -877,7 +1026,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         };
       }
       const finEntry: FinanceTransaction = {
-        id: `FIN-2026-${String(financeTransactions.length + 1).padStart(3, "0")}`,
+        id: `FIN-2026-${String(financeTransactions.length + 1).padStart(
+          3,
+          "0"
+        )}`,
         date: input.date,
         type: input.type,
         category: input.category,
@@ -891,10 +1043,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       appendAudit(
         `Mencatat transaksi keuangan (${input.type})`,
         finEntry.id,
-        `${input.category}: Rp ${input.amountRp.toLocaleString("id-ID")} — ${input.correctionReason || input.description
+        `${input.category}: Rp ${input.amountRp.toLocaleString("id-ID")} — ${
+          input.correctionReason || input.description
         }`
       );
-      return { ok: true, message: `Transaksi ${finEntry.id} berhasil disimpan.` };
+      return {
+        ok: true,
+        message: `Transaksi ${finEntry.id} berhasil disimpan.`,
+      };
     };
 
   const recordGroceryPurchase: AppContextValue["recordGroceryPurchase"] = (
@@ -904,7 +1060,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { ok: false, message: "Akses ditolak." };
     }
     if (!input.items.length) {
-      return { ok: false, message: "Minimal 1 item barang sembako harus diisi." };
+      return {
+        ok: false,
+        message: "Minimal 1 item barang sembako harus diisi.",
+      };
     }
     if (!input.proofFileName.trim()) {
       return { ok: false, message: "Foto nota pembelian wajib diunggah." };
@@ -937,7 +1096,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setPurchases((prev) => [newPurchase, ...prev]);
 
-    // Otomatis catat pengeluaran program agar tidak dihitung dua kali secara manual
     const finEntry: FinanceTransaction = {
       id: `FIN-2026-${String(financeTransactions.length + 1).padStart(3, "0")}`,
       date: input.purchaseDate,
@@ -954,9 +1112,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     appendAudit(
       "Mencatat pembelian sembako",
       newPurchase.id,
-      `Total Rp ${totalTransactionRp.toLocaleString("id-ID")} (${input.receivedConfirmed
-        ? "Barang sudah diterima masuk stok"
-        : "Menunggu konfirmasi barang diterima"
+      `Total Rp ${totalTransactionRp.toLocaleString("id-ID")} (${
+        input.receivedConfirmed
+          ? "Barang sudah diterima masuk stok"
+          : "Menunggu konfirmasi barang diterima"
       })`
     );
 
@@ -1058,7 +1217,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         distributionDate: input.distributionDate,
         location: input.location.trim(),
         packageCount: input.packageCount,
-        recipientCount: input.packageCount, // Aturan Bisnis #10: Setiap satpam menerima 1 paket seragam
+        recipientCount: input.packageCount,
         recipientNote: input.recipientNote.trim(),
         compositionSnapshot: [...packageComposition],
         proofFileName: input.proofFileName.trim(),
@@ -1086,8 +1245,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return { ok: false, message: "Akses ditolak." };
     }
     if (!reason.trim()) {
-      return { ok: false, message: "Alasan penambahan/perubahan akun wajib diisi." };
+      return {
+        ok: false,
+        message: "Alasan penambahan/perubahan akun wajib diisi.",
+      };
     }
+
     if (input.id) {
       setUsers((prev) =>
         prev.map((u) => (u.id === input.id ? { ...u, ...input } : u))
@@ -1103,6 +1266,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         rt: input.rt,
         phone: input.phone || "-",
         active: input.active,
+        // FR-01: Warga, Admin RT, dan Super Admin membuat PIN sendiri pada akun yang telah terdaftar
+        pin: "",
         privacyShowNameInLeaderboard:
           input.privacyShowNameInLeaderboard ?? true,
         createdAt: new Date().toISOString(),
@@ -1113,7 +1278,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         newUser.id,
         `${newUser.name} (${newUser.rt || "Tingkat RW"}) — ${reason.trim()}`
       );
-      return { ok: true, message: `Akun ${newUser.name} berhasil ditambahkan.` };
+      return {
+        ok: true,
+        message: `Akun ${newUser.name} (${
+          newUser.role === "ADMIN_RT" ? `Admin ${newUser.rt}` : `Warga ${newUser.rt}`
+        }) berhasil didaftarkan. Pengguna akan membuat PIN sendiri saat pertama kali login.`,
+      };
     }
   };
 
@@ -1124,11 +1294,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       prev.map((u) =>
         u.id === currentUser.id
           ? {
-            ...u,
-            name: input.name.trim(),
-            phone: input.phone.trim(),
-            privacyShowNameInLeaderboard: input.privacyShowNameInLeaderboard,
-          }
+              ...u,
+              name: input.name.trim(),
+              phone: input.phone.trim(),
+              privacyShowNameInLeaderboard: input.privacyShowNameInLeaderboard,
+            }
           : u
       )
     );
@@ -1160,6 +1330,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         distributions,
         auditLogs,
         metrics,
+        authenticateWithPin,
+        createSelfPin,
+        changeOwnPin,
         recordDeposit,
         updateDepositStatus,
         updateCollectionPoint,
@@ -1187,4 +1360,3 @@ export function useApp() {
   }
   return ctx;
 }
-

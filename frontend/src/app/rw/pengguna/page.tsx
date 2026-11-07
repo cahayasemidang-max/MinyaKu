@@ -6,12 +6,13 @@ import { Card, RoleDeniedBanner } from "@/components/ui";
 import { RT_LIST } from "@/lib/mockData";
 import { RTCode, UserRole } from "@/lib/types";
 import {
+  AlertCircle,
   CheckCircle2,
+  KeyRound,
   MapPin,
   PlusCircle,
   Shield,
   UserPlus,
-  Users,
 } from "lucide-react";
 
 export default function ResidentsAndAdminManagementPage() {
@@ -22,13 +23,14 @@ export default function ResidentsAndAdminManagementPage() {
     auditLogs,
     upsertUserAccount,
     updateCollectionPoint,
+    changeOwnPin,
   } = useApp();
 
-  const [tab, setTab] = useState<"WARGA" | "ADMIN_RT" | "TITIK_RT" | "AUDIT">(
-    "WARGA"
-  );
+  const [tab, setTab] = useState<
+    "WARGA" | "ADMIN_RT" | "TITIK_RT" | "PIN_RW" | "AUDIT"
+  >("WARGA");
 
-  // Form tambah/edit pengguna
+  // Form tambah pengguna
   const [username, setUsername] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<UserRole>("WARGA");
@@ -36,6 +38,12 @@ export default function ResidentsAndAdminManagementPage() {
   const [phone, setPhone] = useState("");
   const [reason, setReason] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  // State ganti PIN Super Admin RW sendiri (FR-01)
+  const [rwCurrentPin, setRwCurrentPin] = useState("");
+  const [rwNewPin, setRwNewPin] = useState("");
+  const [rwConfirmPin, setRwConfirmPin] = useState("");
+  const [rwPinError, setRwPinError] = useState<string | null>(null);
 
   // State edit titik pengumpulan RT
   const [selectedRtPoint, setSelectedRtPoint] = useState<RTCode>("RT 01");
@@ -64,6 +72,7 @@ export default function ResidentsAndAdminManagementPage() {
         rt: role === "SUPER_ADMIN_RW" ? undefined : rt,
         phone,
         active: true,
+        pin: "", // FR-01: Warga & Admin RT membuat PIN sendiri untuk akun yang telah terdaftar
         privacyShowNameInLeaderboard: true,
       },
       reason
@@ -93,6 +102,25 @@ export default function ResidentsAndAdminManagementPage() {
     if (res.ok) setFeedback(res.message);
   };
 
+  const handleChangeRwPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRwPinError(null);
+    if (rwNewPin !== rwConfirmPin) {
+      setRwPinError("Konfirmasi PIN baru Super Admin tidak cocok.");
+      return;
+    }
+    const res = changeOwnPin(rwCurrentPin, rwNewPin);
+    if (!res.ok) {
+      setRwPinError(res.message);
+      return;
+    }
+    setFeedback(res.message);
+    setRwCurrentPin("");
+    setRwNewPin("");
+    setRwConfirmPin("");
+    setTimeout(() => setFeedback(null), 4000);
+  };
+
   const handleSavePoint = (e: React.FormEvent) => {
     e.preventDefault();
     if (!activePoint) return;
@@ -113,11 +141,11 @@ export default function ResidentsAndAdminManagementPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-forest">
-          Manajemen Warga, 7 Admin RT & Titik Pengumpulan (FR-13)
+          Manajemen Warga, 7 Admin RT, PIN & Titik Pengumpulan (FR-01 & FR-13)
         </h1>
         <p className="text-xs sm:text-sm text-ink-muted mt-1">
-          Kelola penugasan 7 Admin RT, akun warga per RT, alamat titik
-          pengumpulan, serta pantau audit log perubahan.
+          Kelola akun warga terdaftar, penugasan 7 Admin RT, alamat titik
+          pengumpulan, PIN Super Admin RW, serta jejak audit.
         </p>
       </div>
 
@@ -132,7 +160,10 @@ export default function ResidentsAndAdminManagementPage() {
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => setTab("WARGA")}
+          onClick={() => {
+            setTab("WARGA");
+            setRole("WARGA");
+          }}
           className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition ${
             tab === "WARGA"
               ? "bg-forest text-white"
@@ -143,7 +174,10 @@ export default function ResidentsAndAdminManagementPage() {
         </button>
         <button
           type="button"
-          onClick={() => setTab("ADMIN_RT")}
+          onClick={() => {
+            setTab("ADMIN_RT");
+            setRole("ADMIN_RT");
+          }}
           className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition ${
             tab === "ADMIN_RT"
               ? "bg-forest text-white"
@@ -165,6 +199,17 @@ export default function ResidentsAndAdminManagementPage() {
         </button>
         <button
           type="button"
+          onClick={() => setTab("PIN_RW")}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition ${
+            tab === "PIN_RW"
+              ? "bg-forest text-white"
+              : "bg-white border border-line text-ink"
+          }`}
+        >
+          PIN Super Admin RW
+        </button>
+        <button
+          type="button"
           onClick={() => setTab("AUDIT")}
           className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition ${
             tab === "AUDIT"
@@ -176,20 +221,27 @@ export default function ResidentsAndAdminManagementPage() {
         </button>
       </div>
 
-      {/* Form Tambah Pengguna Baru */}
+      {/* Form Tambah Pengguna Baru (Warga / Admin RT) */}
       {(tab === "WARGA" || tab === "ADMIN_RT") && (
         <Card>
-          <h2 className="text-base font-bold text-forest mb-3 flex items-center gap-2">
+          <h2 className="text-base font-bold text-forest mb-1 flex items-center gap-2">
             <UserPlus className="w-4 h-4" />
-            Tambah Akun Warga / Admin RT Baru
+            Daftarkan Akun {role === "WARGA" ? "Warga" : "Admin RT"} di Database
+            (FR-01)
           </h2>
+          <p className="text-xs text-ink-muted mb-3">
+            Ketentuan FR-01: Seluruh akun didaftarkan di database oleh pengurus.
+            Baik Warga maupun Admin RT akan membuat PIN pribadinya sendiri saat
+            pertama kali login ke aplikasi.
+          </p>
+
           <form
             onSubmit={handleAddUser}
             className="grid grid-cols-1 sm:grid-cols-3 gap-3"
           >
             <div>
               <label className="block text-xs font-semibold mb-1">
-                Username Login <span className="text-red-600">*</span>
+                Username Akun <span className="text-red-600">*</span>
               </label>
               <input
                 type="text"
@@ -222,8 +274,10 @@ export default function ResidentsAndAdminManagementPage() {
                 onChange={(e) => setRole(e.target.value as UserRole)}
                 className="w-full rounded-xl border border-line px-3 py-2 text-xs sm:text-sm bg-white"
               >
-                <option value="WARGA">Warga Penyetor</option>
-                <option value="ADMIN_RT">Relawan Admin RT</option>
+                <option value="WARGA">Warga Penyetor (Buat PIN Sendiri)</option>
+                <option value="ADMIN_RT">
+                  Relawan Admin RT (Buat PIN Sendiri)
+                </option>
               </select>
             </div>
             <div>
@@ -242,6 +296,7 @@ export default function ResidentsAndAdminManagementPage() {
                 ))}
               </select>
             </div>
+
             <div>
               <label className="block text-xs font-semibold mb-1">
                 Alasan Penambahan (Audit Log){" "}
@@ -250,7 +305,7 @@ export default function ResidentsAndAdminManagementPage() {
               <input
                 type="text"
                 required
-                placeholder="Contoh: Pendaftaran warga RT 04 baru"
+                placeholder="Contoh: Pendaftaran akun warga RT 04"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 className="w-full rounded-xl border border-line px-3 py-2 text-xs sm:text-sm"
@@ -262,7 +317,7 @@ export default function ResidentsAndAdminManagementPage() {
                 className="w-full py-2 rounded-xl bg-forest text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5"
               >
                 <PlusCircle className="w-4 h-4" />
-                Simpan Akun
+                Simpan Akun Terdaftar
               </button>
             </div>
           </form>
@@ -279,6 +334,7 @@ export default function ResidentsAndAdminManagementPage() {
                   <th className="py-3 px-4">ID & Username</th>
                   <th className="py-3 px-4">Nama Lengkap</th>
                   <th className="py-3 px-4">Penugasan RT</th>
+                  <th className="py-3 px-4">Status PIN Mandiri (FR-01)</th>
                   <th className="py-3 px-4">Status Akun</th>
                   <th className="py-3 px-4 text-right">Aksi</th>
                 </tr>
@@ -301,6 +357,17 @@ export default function ResidentsAndAdminManagementPage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
+                        {u.pin ? (
+                          <span className="px-2.5 py-0.5 rounded-full bg-sage text-forest text-xs font-semibold">
+                            Sudah Membuat PIN Pribadi
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-semibold">
+                            Belum Buat PIN (Dibuat mandiri saat login)
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
                         {u.active ? (
                           <span className="text-forest font-bold text-xs">
                             Aktif
@@ -311,7 +378,7 @@ export default function ResidentsAndAdminManagementPage() {
                           </span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => handleToggleActive(u.id, u.active)}
@@ -397,6 +464,82 @@ export default function ResidentsAndAdminManagementPage() {
         </Card>
       )}
 
+      {/* Pengaturan / Ganti PIN Super Admin RW (FR-01) */}
+      {tab === "PIN_RW" && (
+        <Card className="max-w-xl space-y-4">
+          <div className="flex items-center gap-2">
+            <KeyRound className="w-5 h-5 text-forest" />
+            <div>
+              <h2 className="text-base font-bold text-forest">
+                Pengaturan PIN Super Admin RW (FR-01)
+              </h2>
+              <p className="text-xs text-ink-muted">
+                Super Admin membuat dan mengelola PIN sendiri (bebas campuran
+                karakter & angka) untuk mengakses seluruh fitur pengelolaan RW.
+              </p>
+            </div>
+          </div>
+
+          {rwPinError && (
+            <div className="p-3 rounded-xl bg-red-50 border border-red-300 text-red-900 text-xs font-medium flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {rwPinError}
+            </div>
+          )}
+
+          <form onSubmit={handleChangeRwPin} className="space-y-3">
+            {currentUser.pin && (
+              <div>
+                <label className="block text-xs font-semibold mb-1">
+                  PIN Super Admin Saat Ini{" "}
+                  <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={rwCurrentPin}
+                  onChange={(e) => setRwCurrentPin(e.target.value)}
+                  className="w-full rounded-xl border border-line px-3.5 py-2 text-sm"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-semibold mb-1">
+                PIN Baru Super Admin (Bebas Karakter & Angka){" "}
+                <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                value={rwNewPin}
+                onChange={(e) => setRwNewPin(e.target.value)}
+                className="w-full rounded-xl border border-line px-3.5 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">
+                Konfirmasi PIN Baru Super Admin{" "}
+                <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                value={rwConfirmPin}
+                onChange={(e) => setRwConfirmPin(e.target.value)}
+                className="w-full rounded-xl border border-line px-3.5 py-2 text-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-forest text-white text-xs sm:text-sm font-bold"
+            >
+              <KeyRound className="w-4 h-4" />
+              Perbarui PIN Super Admin RW
+            </button>
+          </form>
+        </Card>
+      )}
+
       {/* Audit Log */}
       {tab === "AUDIT" && (
         <Card className="p-0 overflow-hidden">
@@ -433,4 +576,3 @@ export default function ResidentsAndAdminManagementPage() {
     </div>
   );
 }
-

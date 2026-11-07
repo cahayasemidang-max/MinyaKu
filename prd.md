@@ -177,6 +177,9 @@ mengekspor laporan.
 -   Inventaris sembako dan jumlah paket lengkap yang dapat disiapkan.
 -   Pencatatan distribusi paket.
 -   Manajemen akun dan laporan dasar.
+-   Grafik tren pengumpulan minyak berdasarkan periode harian, mingguan, dan bulanan.
+-   Grafik perbandingan volume pengumpulan antar RT.
+-   Filter grafik berdasarkan rentang tanggal dan RT.
 
 ### 6.2 Di luar lingkup
 
@@ -202,6 +205,7 @@ mengekspor laporan.
 -   Kontribusi Saya
 -   Leaderboard
 -   Profil
+-   Dana Program
 
 "Setor Minyak Jelantah" merupakan halaman informasi titik pengumpulan
 dan panduan penyerahan langsung, bukan formulir pemesanan jadwal.
@@ -213,6 +217,7 @@ dan panduan penyerahan langsung, bukan formulir pemesanan jadwal.
 -   Riwayat Pengumpulan
 -   Rekap RT
 -   Profil
+-   Dana Program
 
 ### 7.3 Super Admin RW
 
@@ -229,11 +234,28 @@ dan panduan penyerahan langsung, bukan formulir pemesanan jadwal.
 
 ### FR-01 --- Autentikasi dan otorisasi
 
--   Pengguna masuk menggunakan akun yang terdaftar.
--   Sistem menentukan role dan RT yang ditugaskan.
+Seluruh akun pengguna (Warga, Admin RT, dan Super Admin) telah terdaftar di dalam database nantinya. Pengguna tidak perlu melakukan registrasi akun melalui aplikasi. Proses autentikasi dilakukan menggunakan PIN sesuai dengan ketentuan masing-masing role.
+
+Ketentuan PIN:
+**- Warga**
+- Warga membuat PIN sendiri untuk akun yang telah terdaftar.
+- PIN digunakan untuk login ke aplikasi.
+
+**- Admin RT**
+- Admin RT membuat PIN sendiri untuk akun yang telah terdaftar.
+- PIN digunakan untuk login ke aplikasi
+
+**- Super Admin**
+-   Super Admin membuat PIN sendiri untuk akun yang telah terdaftar.
+-   PIN digunakan untuk mengakses seluruh fitur pengelolaan RW.
+
+**Ketentuan Umum:**
+-   Pengguna login menggunakan identitas akun yang telah terdaftar dan PIN.
+-   Sistem memvalidasi PIN berdasarkan akun dan role pengguna di database.
+-   Setiap akun memiliki PIN masing-masing.
+-   Sistem menyediakan fitur untuk mengganti PIN.
 -   Menu, halaman, dan data yang dapat diakses menyesuaikan role.
--   Akses langsung ke endpoint yang tidak berwenang harus ditolak oleh
-    backend.
+-   Akses langsung ke endpoint yang tidak berwenang harus ditolak olehbackend.
 
 ### FR-02 --- Informasi titik pengumpulan
 
@@ -340,6 +362,12 @@ total pengeluaran yang tercatat.**
 
 Saldo ini bukan pengganti rekonsiliasi dengan rekening atau kas nyata.
 
+**Ketentuan akses berdasarkan role:**
+
+**- Warga:** Dapat melihat ringkasan neraca dana program sebagai bentuk transparansi pengelolaan dana.
+**- Admin RT:** Dapat melihat ringkasan neraca dana program sebagai bentuk transparansi pengelolaan dana.
+**- Super Admin:** Dapat melihat seluruh rincian transaksi, mencatat pemasukan dan pengeluaran dana program serta mengelola data dana program
+
 ### FR-10 --- Pembelian sembako
 
 Setiap pembelian dapat berisi beberapa item dan mencatat: - ID
@@ -393,6 +421,19 @@ Pembelian sembako. - Inventaris sembako. - Distribusi paket.
 
 Laporan harus memiliki filter dan dapat diekspor bila fitur ekspor
 diimplementasikan.
+
+### FR-15 --- Grafik Tren Pengumpulan Minyak Jelantah
+
+Sistem harus menyediakan grafik visual untuk memantau perkembangan pengumpulan minyak jelantah.
+Ketentuan:
+-   Grafik menampilkan volume minyak jelantah dalam satuan liter (L).
+-   Data grafik menggunakan catatan setoran yang telah terverifikasi.
+-   Super Admin dapat melihat tren pengumpulan seluruh RW maupun membandingkan masing-masing dari tujuh RT.
+-   Admin RT hanya dapat melihat tren pengumpulan RT yang menjadi tanggung jawabnya.
+-   Warga dapat melihat tren kontribusi miliknya sendiri.
+-   Grafik harus dapat menyesuaikan data berdasarkan rentang tanggal yang dipilih.
+-   Tampilkan kondisi ketika belum ada data yang tersedia.
+-   Gunakan line chart untuk menampilkan trend pengumpulan minyak jelantah.
 
 ## 9. Persyaratan Data dan Perhitungan
 
@@ -451,11 +492,11 @@ pemahaman.
 ### 10.2 Pola layout per role
 
 **Warga:** mobile-first dengan navigasi bawah dan aksi utama yang mudah
-ditemukan.\
+ditemukan dan grafik tren kontribusi pribadi berdasarkan periode waktu.\
 **Admin RT:** mobile-friendly, input cepat, tombol besar, dan sedikit
-pengetikan.\
+pengetikan dan grafik tren pengumpulan minyak di RT masing-masing.\
 **Super Admin:** desktop-first dengan sidebar, KPI, filter, tabel,
-grafik, dan detail transaksi.
+grafik, dan detail transaksi dan grafik tren pengumpulan seluruh RW dan grafik perbandingan tujuh RT.
 
 ### 10.3 Kondisi antarmuka
 
@@ -547,6 +588,14 @@ Produk atau prototipe dianggap sesuai dengan PRD apabila:
 -   [ ] Desain responsif dan sesuai kebutuhan tiap role.
 -   [ ] Aksi penting dan perubahan data memiliki konfirmasi atau jejak
     audit yang sesuai.
+-   [ ] Dashboard menyediakan grafik tren pengumpulan minyak jelantah.
+-   [ ] Grafik dapat menampilkan data harian, mingguan, dan bulanan.
+-   [ ] Grafik dapat difilter berdasarkan periode.
+-   [ ] Super Admin dapat membandingkan volume pengumpulan antar-7 RT.
+-   [ ] Admin RT hanya melihat grafik RT yang menjadi tanggung jawabnya.
+-   [ ] Warga hanya melihat grafik kontribusi pribadinya.
+-   [ ] Grafik menggunakan data setoran terverifikasi dan satuan liter.
+-   [ ] Grafik tidak mencampurkan volume minyak terkumpul dengan volume minyak yang telah diserahkan ke dinas.
 
 ## 14. Hal yang Masih Perlu Dikonfirmasi
 

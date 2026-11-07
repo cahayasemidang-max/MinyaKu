@@ -9,6 +9,7 @@ import {
   StatCard,
   formatLiters,
 } from "@/components/ui";
+import { OilTrendChart } from "@/components/CollectionCharts";
 import { BarChart3, CheckCircle2, Droplets, Users } from "lucide-react";
 
 export default function RTReportPage() {
@@ -36,7 +37,6 @@ export default function RTReportPage() {
   const uniqueContributors = new Set(verifiedDeposits.map((d) => d.residentId))
     .size;
 
-  // Rekap bulanan RT
   const monthlyMap = new Map<
     string,
     { verifiedLiters: number; count: number; needCheckCount: number }
@@ -66,11 +66,11 @@ export default function RTReportPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-forest">
-          Rekap Pengumpulan {currentUser.rt}
+          Rekap & Grafik Tren Pengumpulan {currentUser.rt}
         </h1>
         <p className="text-xs sm:text-sm text-ink-muted mt-1">
-          Ringkasan operasional pengumpulan minyak jelantah khusus untuk wilayah{" "}
-          {currentUser.rt} (FR-06).
+          Ringkasan operasional dan grafik perkembangan pengumpulan minyak
+          jelantah khusus wilayah {currentUser.rt} (FR-06 & FR-15).
         </p>
       </div>
 
@@ -95,6 +95,13 @@ export default function RTReportPage() {
           icon={<Users className="w-5 h-5" />}
         />
       </div>
+
+      {/* Grafik Tren Pengumpulan RT (Harian/Mingguan/Bulanan + Filter Rentang Tanggal) */}
+      <OilTrendChart
+        title={`Grafik Tren Pengumpulan ${currentUser.rt} (Harian / Mingguan / Bulanan)`}
+        subtitle={`Filter perkembangan volume setoran terverifikasi di ${currentUser.rt} berdasarkan rentang tanggal.`}
+        deposits={rtDeposits}
+      />
 
       <Card className="p-0 overflow-hidden">
         <div className="p-4 sm:p-5 border-b border-line flex items-center gap-2">
@@ -149,4 +156,3 @@ export default function RTReportPage() {
     </div>
   );
 }
-

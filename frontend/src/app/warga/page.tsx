@@ -11,6 +11,7 @@ import {
   StatusBadge,
   formatLiters,
 } from "@/components/ui";
+import { OilTrendChart } from "@/components/CollectionCharts";
 import {
   ArrowRight,
   Award,
@@ -34,6 +35,7 @@ export default function ResidentDashboardPage() {
     );
   }
 
+  // Warga hanya melihat data dan grafik kontribusi pribadinya (FR-15 & Bab 10.2)
   const myDeposits = deposits.filter((d) => d.residentId === currentUser.id);
   const myVerifiedLiters = myDeposits
     .filter((d) => d.status === "Terverifikasi")
@@ -59,10 +61,10 @@ export default function ResidentDashboardPage() {
               Halo, {currentUser.name}
             </h1>
             <p className="text-xs sm:text-sm text-cream/90 mt-1 max-w-2xl">
-              Setiap tetes minyak jelantah yang Anda sedekahkan di titik pengumpulan{" "}
-              <strong>{currentUser.rt}</strong> diserahkan ke Dinas Kebersihan Kota
-              Bekasi untuk diwujudkan menjadi paket sembako seragam bagi satpam
-              lingkungan RW kita.
+              Setiap tetes minyak jelantah yang Anda sedekahkan di titik
+              pengumpulan <strong>{currentUser.rt}</strong> diserahkan ke Dinas
+              Kebersihan Kota Bekasi untuk diwujudkan menjadi paket sembako
+              seragam bagi satpam lingkungan RW kita.
             </p>
           </div>
           <Link
@@ -75,7 +77,7 @@ export default function ResidentDashboardPage() {
         </div>
       </div>
 
-      {/* Ringkasan Kontribusi Pribadi (Tanpa Saldo Uang — Aturan Bisnis #2) */}
+      {/* Ringkasan Kontribusi Pribadi */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <StatCard
           highlight
@@ -106,6 +108,13 @@ export default function ResidentDashboardPage() {
         />
       </div>
 
+      {/* Grafik Tren Kontribusi Pribadi Warga (FR-15 & Bab 10.2) */}
+      <OilTrendChart
+        title="Grafik Tren Kontribusi Minyak Jelantah Saya (Liter)"
+        subtitle="Menampilkan perkembangan sedekah minyak jelantah pribadi Anda yang telah Terverifikasi berdasarkan periode Harian, Mingguan, atau Bulanan."
+        deposits={myDeposits}
+      />
+
       {/* Info Titik Pengumpulan Singkat & Aksi Cepat */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="flex flex-col justify-between">
@@ -128,8 +137,8 @@ export default function ResidentDashboardPage() {
                   myPoint.address
                 ) : (
                   <span className="italic text-amber-800">
-                    Belum diisi oleh pengelola RT/RW (Sesuai PRD: Tidak mengarang
-                    alamat fiktif)
+                    Belum diisi oleh pengelola RT/RW (Sesuai PRD: Tidak
+                    mengarang alamat fiktif)
                   </span>
                 )}
               </p>
@@ -217,8 +226,8 @@ export default function ResidentDashboardPage() {
           <div className="mt-4 p-2.5 rounded-xl bg-sage/40 text-[11px] text-forest flex items-center gap-2">
             <Info className="w-4 h-4 shrink-0" />
             <span>
-              Minyak jelantah adalah sedekah murni (tidak ada pengembalian uang/saldo
-              kepada warga).
+              Minyak jelantah adalah sedekah murni (tidak ada pengembalian
+              uang/saldo kepada warga).
             </span>
           </div>
         </Card>
@@ -290,4 +299,3 @@ export default function ResidentDashboardPage() {
     </div>
   );
 }
-
