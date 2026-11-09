@@ -505,6 +505,17 @@ Error state. - Validasi formulir. - Konfirmasi tindakan penting. -
 Feedback sukses atau gagal. - Tampilan data contoh yang jelas diberi
 label jika digunakan untuk prototipe.
 
+### 10.4 Responsive dan Full-Screen Layout
+
+-   Aplikasi harus menggunakan pendekatan responsive design agar dapat menyesuaikan ukuran layar desktop, laptop, tablet, dan smartphone.
+-   Layout aplikasi harus memanfaatkan seluruh area layar yang tersedia (full-width dan full-height), bukan menggunakan container sempit yang menyisakan margin kosong berlebihan.
+-   Pada desktop, dashboard harus memanfaatkan lebar layar secara optimal agar tabel, grafik, kartu informasi, dan navigasi dapat ditampilkan dengan proporsional.
+-   Pada tablet dan smartphone, seluruh komponen harus menyesuaikan ukuran layar tanpa menyebabkan konten terpotong atau horizontal scrolling yang tidak diperlukan.
+-   Sidebar pada desktop dapat berubah menjadi navigasi drawer atau menu mobile pada layar yang lebih kecil.
+-   Tinggi konten harus menyesuaikan viewport perangkat, dengan scrolling pada area konten apabila diperlukan.
+-   Ukuran teks, tombol, kartu, tabel, grafik, dan elemen navigasi harus tetap nyaman digunakan pada setiap ukuran layar.
+-   Tidak boleh terdapat elemen yang keluar dari batas layar atau saling bertumpuk akibat perubahan ukuran viewport.
+
 ## 11. Persyaratan Nonfungsional
 
 -   **Keamanan:** autentikasi, otorisasi berbasis peran, validasi

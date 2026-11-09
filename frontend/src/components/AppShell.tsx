@@ -216,18 +216,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       : "Super Admin RW (7 RT)";
 
   return (
-    <div className="min-h-screen flex flex-col bg-cream text-ink">
-      {/* Banner Prototipe & Switcher Peran */}
-      <div className="bg-forest-dark text-white text-xs border-b border-white/10 px-3 sm:px-6 py-2">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-400 text-ink font-bold text-[11px]">
+    <div className="min-h-dvh lg:h-dvh lg:overflow-hidden w-full flex flex-col bg-cream text-ink overflow-x-hidden">
+      {/* Banner Prototipe & Switcher Peran (Full-Width) */}
+      <div className="w-full shrink-0 bg-forest-dark text-white text-xs border-b border-white/10 px-3 sm:px-6 lg:px-8 py-2">
+        <div className="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-400 text-ink font-bold text-[11px] shrink-0">
               <SlidersHorizontal className="w-3 h-3" />
               {isIllustrativeMode
                 ? "MODE DATA ILUSTRATIF (PROTOTIPE)"
                 : "MODE DATA KOSONG (TANPA DATA FIKTIF)"}
             </span>
-            <span className="text-cream/85 hidden sm:inline">
+            <span className="text-cream/85 hidden sm:inline truncate">
               Sesuai Aturan Bisnis #14 PRD: Data contoh diberi label ilustratif.
             </span>
           </div>
@@ -240,7 +240,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label="Pilih Peran Pengguna"
               value={currentUser.id}
               onChange={(e) => handleSwitchUser(e.target.value)}
-              className="bg-forest text-white border border-sage/40 rounded-lg px-2.5 py-1 text-xs font-medium focus:outline-none"
+              className="max-w-full bg-forest text-white border border-sage/40 rounded-lg px-2.5 py-1 text-xs font-medium focus:outline-none"
             >
               {users.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -256,7 +256,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => toggleDataMode(!isIllustrativeMode)}
-              className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium transition"
+              className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium transition shrink-0"
             >
               {isIllustrativeMode
                 ? "Ubah ke Seed Kosong"
@@ -266,14 +266,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* Top Header Bar */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-line px-3 sm:px-6 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+      {/* Top Header Bar (Full-Width) */}
+      <header className="sticky top-0 z-30 w-full shrink-0 bg-white/95 backdrop-blur border-b border-line px-3 sm:px-6 lg:px-8 py-3">
+        <div className="w-full flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={() => setMobileDrawerOpen(true)}
-              className="lg:hidden p-2 rounded-xl border border-line text-ink hover:bg-sage/40"
+              className="lg:hidden p-2 rounded-xl border border-line text-ink hover:bg-sage/40 shrink-0"
               aria-label="Buka Menu Navigasi"
             >
               <Menu className="w-5 h-5" />
@@ -287,21 +287,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   ? "/rt"
                   : "/rw"
               }
-              className="flex items-center gap-2.5"
+              className="flex items-center gap-2.5 min-w-0"
             >
-              <div className="w-9 h-9 rounded-xl bg-forest text-white flex items-center justify-center font-bold shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-forest text-white flex items-center justify-center font-bold shadow-sm shrink-0">
                 <Droplets className="w-5 h-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-base sm:text-lg text-forest tracking-tight">
+                  <span className="font-bold text-base sm:text-lg text-forest tracking-tight truncate">
                     Jelantah Berkah
                   </span>
-                  <span className="hidden sm:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sage text-forest">
+                  <span className="hidden md:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sage text-forest shrink-0">
                     Sedekah Minyak Jelantah & Sembako
                   </span>
                 </div>
-                <p className="text-[11px] text-ink-muted hidden sm:block">
+                <p className="text-[11px] text-ink-muted hidden sm:block truncate">
                   Program Sosial Lingkungan RW (7 RT) • Tanpa Transaksi Uang ke
                   Warga
                 </p>
@@ -309,9 +309,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 shrink-0">
             <div className="text-right">
-              <p className="text-xs sm:text-sm font-semibold text-ink leading-tight">
+              <p className="text-xs sm:text-sm font-semibold text-ink leading-tight max-w-[140px] sm:max-w-none truncate">
                 {currentUser.name}
               </p>
               <p className="text-[11px] font-medium text-forest">
@@ -329,11 +329,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Main Layout Container */}
-      <div className="flex-1 max-w-7xl w-full mx-auto flex flex-col lg:flex-row gap-0 lg:gap-6 px-3 sm:px-6 pt-4 pb-24 lg:pb-10">
-        {/* Sidebar Desktop */}
-        <aside className="hidden lg:block w-64 shrink-0">
-          <div className="sticky top-20 bg-white rounded-card border border-line shadow-soft p-3 space-y-1">
+      {/* Main Full-Screen Layout Container (Bab 10.4 PRD: Full-Width & Full-Height Viewport) */}
+      <div className="flex-1 w-full min-h-0 flex flex-col lg:flex-row">
+        {/* Sidebar Desktop Full-Height */}
+        <aside className="hidden lg:flex lg:flex-col lg:justify-between lg:w-64 xl:w-72 shrink-0 bg-white border-r border-line overflow-y-auto p-4">
+          <div className="space-y-1">
             <div className="px-3 py-2 border-b border-line mb-2">
               <p className="text-[11px] uppercase tracking-wider font-bold text-ink-muted">
                 Menu Navigasi
@@ -360,18 +360,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+          </div>
 
-            <div className="pt-3 mt-3 border-t border-line px-3 py-2 bg-cream/60 rounded-xl">
-              <p className="text-[11px] font-semibold text-forest flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5" />
-                Prinsip Program
-              </p>
-              <p className="text-[11px] text-ink-muted mt-1 leading-relaxed">
-                Hanya mengelola sedekah minyak jelantah (Liter). Hasil
-                penyerahan ke Dinas Kebersihan Kota Bekasi disalurkan menjadi
-                paket sembako seragam bagi satpam.
-              </p>
-            </div>
+          <div className="pt-3 mt-4 border-t border-line px-3.5 py-3 bg-cream/60 rounded-xl">
+            <p className="text-[11px] font-semibold text-forest flex items-center gap-1.5">
+              <BookOpen className="w-3.5 h-3.5" />
+              Prinsip Program
+            </p>
+            <p className="text-[11px] text-ink-muted mt-1 leading-relaxed">
+              Hanya mengelola sedekah minyak jelantah (Liter). Hasil penyerahan
+              ke Dinas Kebersihan Kota Bekasi disalurkan menjadi paket sembako
+              seragam bagi satpam.
+            </p>
           </div>
         </aside>
 
@@ -434,20 +434,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        {/* Konten Utama Fleksibel */}
-        <main className="flex-1 min-w-0 space-y-5">{children}</main>
+        {/* Area Konten Utama Full-Width & Viewport-Scrollable */}
+        <main className="flex-1 min-w-0 w-full lg:overflow-y-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-24 lg:pb-8 space-y-5">
+          {children}
+        </main>
       </div>
 
-      {/* Bottom Navigation Bar untuk Layar HP/Mobile */}
+      {/* Bottom Navigation Bar untuk Layar HP/Mobile & Tablet */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-line px-1.5 py-1.5">
-        <div className="grid grid-cols-6 gap-1 max-w-lg mx-auto">
+        <div className="grid grid-cols-6 gap-1 w-full">
           {activeNav.slice(0, 6).map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] font-medium transition ${
+                className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-[10px] sm:text-xs font-medium transition ${
                   isActive
                     ? "bg-forest text-white"
                     : "text-ink-muted hover:text-forest"

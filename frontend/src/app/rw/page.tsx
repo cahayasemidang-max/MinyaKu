@@ -183,16 +183,17 @@ export default function RWSuperAdminDashboardPage() {
         </div>
       </div>
 
-      {/* Grafik 1: Tren Pengumpulan Seluruh RW dengan Filter Harian/Mingguan/Bulanan, Rentang Tanggal & RT (FR-15) */}
-      <OilTrendChart
-        title="Grafik Tren Pengumpulan Minyak Jelantah Tingkat RW (Liter)"
-        subtitle="Pantau perkembangan volume minyak jelantah terverifikasi seluruh RW atau per RT berdasarkan periode Harian, Mingguan, dan Bulanan (Tanpa dicampur dengan volume penyerahan ke dinas)."
-        deposits={deposits}
-        allowRTFilter={true}
-      />
+      {/* Grafik 1 & 2 (FR-15): Proporsional Full-Width di Desktop */}
+      <div className="grid grid-cols-1 2xl:grid-cols-2 gap-5 items-start">
+        <OilTrendChart
+          title="Grafik Tren Pengumpulan Minyak Jelantah Tingkat RW (Liter)"
+          subtitle="Pantau perkembangan volume minyak jelantah terverifikasi seluruh RW atau per RT berdasarkan periode Harian, Mingguan, dan Bulanan (Tanpa dicampur dengan volume penyerahan ke dinas)."
+          deposits={deposits}
+          allowRTFilter={true}
+        />
 
-      {/* Grafik 2: Perbandingan Volume Pengumpulan Antar-7 RT dengan Filter Rentang Tanggal (FR-15) */}
-      <RTComparisonChart deposits={deposits} />
+        <RTComparisonChart deposits={deposits} />
+      </div>
     </div>
   );
 }

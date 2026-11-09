@@ -105,8 +105,8 @@ export function OilTrendChart({
   const maxLiters = Math.max(...series.map((s) => s.liters), 1);
   const totalInChart = series.reduce((acc, s) => acc + s.liters, 0);
 
-  // Perhitungan koordinat SVG Line Chart (FR-15 Baris 436)
-  const svgWidth = Math.max(540, series.length * 110);
+  // Perhitungan koordinat SVG Line Chart (FR-15 & Bab 10.4 Responsive)
+  const svgWidth = Math.max(360, series.length * 105);
   const svgHeight = 230;
   const padLeft = 48;
   const padRight = 36;
@@ -252,7 +252,9 @@ export function OilTrendChart({
           <div className="w-full overflow-x-auto rounded-xl border border-line bg-cream/25 p-2">
             <svg
               viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-              className="w-full h-60 min-w-[480px]"
+              className={`w-full h-56 sm:h-64 ${
+                series.length > 5 ? "min-w-[520px]" : "min-w-0"
+              }`}
               role="img"
               aria-label={title}
             >

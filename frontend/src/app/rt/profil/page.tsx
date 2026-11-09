@@ -83,7 +83,7 @@ export default function RTAdminProfilePage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="w-full space-y-5">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-forest">
           Profil Relawan, PIN & Titik Pengumpulan {currentUser.rt}
@@ -101,8 +101,9 @@ export default function RTAdminProfilePage() {
         </div>
       )}
 
-      {/* Ganti PIN Admin RT (FR-01) */}
-      <Card>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+        {/* Ganti PIN Admin RT (FR-01) */}
+        <Card>
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <KeyRound className="w-5 h-5 text-forest" />
@@ -277,6 +278,7 @@ export default function RTAdminProfilePage() {
           </button>
         </form>
       </Card>
+      </div>
     </div>
   );
 }

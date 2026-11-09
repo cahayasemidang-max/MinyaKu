@@ -69,7 +69,7 @@ export default function ResidentProfilePage() {
   };
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="w-full space-y-5">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-forest">
           Profil, Privasi & Pengaturan PIN Warga
@@ -87,7 +87,8 @@ export default function ResidentProfilePage() {
         </div>
       )}
 
-      <Card>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+        <Card>
         <h2 className="text-base font-bold text-forest mb-4">
           Informasi Profil & Privasi
         </h2>
@@ -257,6 +258,7 @@ export default function ResidentProfilePage() {
           </button>
         </form>
       </Card>
+      </div>
     </div>
   );
 }

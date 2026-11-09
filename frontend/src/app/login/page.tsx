@@ -85,8 +85,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-4 sm:py-8 space-y-6">
-      <Card className="p-6 sm:p-8">
+    <div className="w-full py-2 sm:py-4 grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+      <Card className="p-6 sm:p-8 xl:col-span-7">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-line">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-forest text-white flex items-center justify-center">
@@ -284,11 +284,11 @@ export default function LoginPage() {
       </Card>
 
       {/* Ringkasan Ketentuan PIN FR-01 */}
-      <Card>
+      <Card className="xl:col-span-5">
         <h2 className="text-sm font-bold text-forest mb-2">
           Ketentuan Autentikasi PIN Berdasarkan Peran (FR-01 PRD)
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+        <div className="grid grid-cols-1 gap-3 text-xs">
           <div className="p-3.5 rounded-xl bg-cream/60 border border-line">
             <p className="font-bold text-ink">1. Warga</p>
             <p className="text-ink-muted mt-1">

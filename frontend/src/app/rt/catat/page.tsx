@@ -90,7 +90,7 @@ export default function RecordDonationFormPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="w-full space-y-5">
       <div>
         <span className="text-xs font-bold uppercase tracking-wider text-forest">
           Titik Pengumpulan Tetap • {currentUser.rt}
