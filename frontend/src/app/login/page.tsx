@@ -45,7 +45,7 @@ interface DbUserPublic {
 }
 
 export default function LoginPage() {
-  const { setAuthenticatedSession } = useApp();
+  const { jwtToken, setAuthenticatedSession } = useApp();
   const router = useRouter();
 
   const [boundAccount, setBoundAccount] = useState<BoundAccountInfo | null>(
@@ -54,6 +54,11 @@ export default function LoginPage() {
   const [username, setUsername] = useState<string>("");
   const [credential, setCredential] = useState<string>("");
   const [showCredential, setShowCredential] = useState<boolean>(false);
+  const [checkedAccountStatus, setCheckedAccountStatus] = useState<{
+    found: boolean;
+    role?: string;
+    is_first_login?: boolean;
+  } | null>(null);
 
   // State khusus Tahap 2 (Set PIN 6 Digit ala Bank Jago saat pertama kali aktif)
   const [pendingSetupToken, setPendingSetupToken] = useState<string | null>(
@@ -74,6 +79,13 @@ export default function LoginPage() {
 
   useEffect(() => {
     try {
+      const savedToken = localStorage.getItem("minyaku_jwt_token");
+      // Jika sudah log out (tidak ada token aktif), hapus pengingat akun agar kembali bersih
+      if (!savedToken) {
+        localStorage.removeItem(BOUND_ACCOUNT_STORAGE_KEY);
+        setBoundAccount(null);
+        return;
+      }
       const savedBound = localStorage.getItem(BOUND_ACCOUNT_STORAGE_KEY);
       if (savedBound) {
         const parsed: BoundAccountInfo = JSON.parse(savedBound);
@@ -85,8 +97,29 @@ export default function LoginPage() {
     } catch {
       // ignore storage errors
     }
-  }, []);
+  }, [jwtToken]);
 
+  useEffect(() => {
+    const trimmed = username.trim();
+    if (!trimmed || trimmed.length < 3 || boundAccount) {
+      setCheckedAccountStatus(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/api/auth/check-username/${encodeURIComponent(trimmed)}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setCheckedAccountStatus(data);
+        }
+      } catch {
+        // ignore network errors during typing check
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [username, boundAccount]);
   const saveBoundAccount = (user: DbUserPublic) => {
     const info: BoundAccountInfo = {
       username: user.username,
@@ -250,14 +283,15 @@ export default function LoginPage() {
     await executeSetupPin(newPin, confirmPin);
   };
 
-  // Handler Numpad Bank Jago untuk Layar HP (ketika akun sudah terikat / boundAccount)
+  // Handler Numpad Bank Jago untuk Layar HP
   const handleMobileLoginDigit = (digit: string) => {
-    if (submitting || !boundAccount) return;
+    const targetUser = boundAccount ? boundAccount.username : username.trim();
+    if (submitting || !targetUser) return;
     setErrorMsg(null);
     const nextVal = (credential + digit).slice(0, 6);
     setCredential(nextVal);
     if (nextVal.length === 6) {
-      executeLogin(boundAccount.username, nextVal);
+      executeLogin(targetUser, nextVal);
     }
   };
 
@@ -603,66 +637,130 @@ export default function LoginPage() {
                LAYAR 1B: PERTAMA KALI BUKA DI PERANGKAT (Input Nomor Rumah + Password Awal)
                ================================================================ */
             <form onSubmit={handleLoginSubmit} className="mt-6 space-y-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
-                  Nomor Rumah / Username
-                </label>
-                <div className="relative">
-                  <Home className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    required
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Contoh: B713"
-                    className="w-full rounded-xl border border-line bg-white pl-10 pr-4 py-2.5 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-forest"
-                  />
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
+                    Nomor Rumah / Username
+                  </label>
+                  <div className="relative">
+                    <Home className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
+                    <input
+                      type="text"
+                      required
+                      value={username}
+                      onChange={(e) => {
+                        setUsername(e.target.value);
+                        setCredential("");
+                        setErrorMsg(null);
+                      }}
+                      placeholder="Contoh: B713"
+                      className="w-full rounded-xl border border-line bg-white pl-10 pr-4 py-2.5 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-forest"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
-                  Password / PIN
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
-                  <input
-                    type={showCredential ? "text" : "password"}
-                    required
-                    value={credential}
-                    onChange={(e) => setCredential(e.target.value)}
-                    placeholder="Masukkan Nama Depan KK atau PIN"
-                    className="w-full rounded-xl border border-line bg-white pl-10 pr-10 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCredential((prev) => !prev)}
-                    className="absolute right-3 top-2.5 text-ink-muted hover:text-ink"
-                    tabIndex={-1}
-                    aria-label="Tampilkan atau sembunyikan Password"
-                  >
-                    {showCredential ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
+                {/* Jika di HP (< md) dan akun yang diketik SUDAH punya PIN (is_first_login = false), tampilkan Numpad Bank Jago! */}
+                {checkedAccountStatus?.found &&
+                checkedAccountStatus.is_first_login === false &&
+                checkedAccountStatus.role !== "SUPER_ADMIN_RW" ? (
+                  <>
+                    {renderBankJagoMobilePad(
+                      credential,
+                      handleMobileLoginDigit,
+                      handleMobileLoginBackspace,
+                      "Masukkan 6 digit PIN Anda"
                     )}
-                  </button>
-                </div>
-                <p className="text-[11px] text-ink-muted mt-1.5 leading-relaxed">
-                  Pengguna baru: masukkan{" "}
-                  <strong>Nama Depan Kepala Keluarga</strong> untuk lanjut
-                  membuat PIN 6 digit.
-                </p>
-              </div>
+                    <div className="hidden md:block space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-ink mb-1.5">
+                          PIN 6 Digit Anda
+                        </label>
+                        <div className="relative">
+                          <Lock className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
+                          <input
+                            type={showCredential ? "text" : "password"}
+                            inputMode="numeric"
+                            maxLength={6}
+                            required
+                            value={credential}
+                            onChange={(e) =>
+                              setCredential(
+                                e.target.value.replace(/\D/g, "").slice(0, 6)
+                              )
+                            }
+                            placeholder="Masukkan 6 digit PIN"
+                            className="w-full rounded-xl border border-line bg-white pl-10 pr-10 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCredential((prev) => !prev)}
+                            className="absolute right-3 top-2.5 text-ink-muted hover:text-ink"
+                            tabIndex={-1}
+                          >
+                            {showCredential ? (
+                              <EyeOff className="w-4 h-4" />
+                            ) : (
+                              <Eye className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-60"
+                      >
+                        <UserCheck className="w-4 h-4" />
+                        {submitting ? "Memproses..." : "Masuk"}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
+                        Password / PIN
+                      </label>
+                      <div className="relative">
+                        <Lock className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
+                        <input
+                          type={showCredential ? "text" : "password"}
+                          required
+                          value={credential}
+                          onChange={(e) => setCredential(e.target.value)}
+                          placeholder="Masukkan Nama Depan KK atau PIN"
+                          className="w-full rounded-xl border border-line bg-white pl-10 pr-10 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCredential((prev) => !prev)}
+                          className="absolute right-3 top-2.5 text-ink-muted hover:text-ink"
+                          tabIndex={-1}
+                          aria-label="Tampilkan atau sembunyikan Password"
+                        >
+                          {showCredential ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-ink-muted mt-1.5 leading-relaxed">
+                        Pengguna baru: masukkan{" "}
+                        <strong>Nama Depan Kepala Keluarga</strong> untuk lanjut
+                        membuat PIN 6 digit.
+                      </p>
+                    </div>
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-60"
-              >
-                <UserCheck className="w-4 h-4" />
-                {submitting ? "Memproses..." : "Masuk"}
-              </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="w-full py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-60"
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      {submitting ? "Memproses..." : "Masuk"}
+                    </button>
+                  </>
+                )}
             </form>
           )}
 

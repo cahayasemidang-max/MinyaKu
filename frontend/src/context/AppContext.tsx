@@ -591,6 +591,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setJwtToken(null);
     try {
       localStorage.removeItem("minyaku_jwt_token");
+      localStorage.removeItem("minyaku_bound_account");
     } catch {
       // ignore storage errors
     }
