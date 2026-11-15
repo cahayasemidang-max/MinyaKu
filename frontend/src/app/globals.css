@@ -5,6 +5,7 @@
 :root {
   --bg-cream: #f5f0e4;
   --text-ink: #24352b;
+  --font-jakarta: "Plus Jakarta Sans", sans-serif;
 }
 
 html,

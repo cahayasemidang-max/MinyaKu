@@ -4,84 +4,179 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { Card } from "@/components/ui";
+import { RTCode, UserAccount, UserRole } from "@/lib/types";
 import {
   AlertCircle,
+  CheckCircle2,
   Droplets,
+  Home,
   KeyRound,
   Lock,
+  RefreshCw,
   ShieldCheck,
   UserCheck,
 } from "lucide-react";
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+interface DbUserPublic {
+  id: number;
+  username: string;
+  nama_lengkap: string;
+  role: UserRole;
+  rt?: RTCode | null;
+  no_hp?: string | null;
+  is_first_login: boolean;
+  saldo_rupiah: number;
+  total_liter: number;
+  active: boolean;
+}
+
 export default function LoginPage() {
-  const {
-    users,
-    currentUser,
-    authenticateWithPin,
-    createSelfPin,
-    isIllustrativeMode,
-    toggleDataMode,
-  } = useApp();
+  const { setAuthenticatedSession } = useApp();
   const router = useRouter();
 
-  const [selectedUserId, setSelectedUserId] = useState(currentUser.id);
-  const [pinInput, setPinInput] = useState("");
-  const [confirmNewPin, setConfirmNewPin] = useState("");
+  const [dbUsers, setDbUsers] = useState<DbUserPublic[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState<boolean>(true);
+  const [username, setUsername] = useState<string>("B713");
+  const [credential, setCredential] = useState<string>("");
+
+  // State khusus tahap 2 (Pembuatan PIN perdana setelah verifikasi Nama Depan KK)
+  const [pendingSetupToken, setPendingSetupToken] = useState<string | null>(
+    null
+  );
+  const [pendingUser, setPendingUser] = useState<DbUserPublic | null>(null);
+  const [newPin, setNewPin] = useState<string>("");
+  const [confirmPin, setConfirmPin] = useState<string>("");
+
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
 
-  const selectedAccount =
-    users.find((u) => u.id === selectedUserId) || users[0];
-
-  // FR-01: Warga, Admin RT, dan Super Admin membuat PIN sendiri untuk akun yang telah terdaftar
-  const needsSelfPinCreation = selectedAccount && !selectedAccount.pin;
+  const fetchDbUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/users`);
+      if (res.ok) {
+        const data: DbUserPublic[] = await res.json();
+        setDbUsers(data);
+      }
+    } catch {
+      // Backend might not be running yet
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   useEffect(() => {
-    setErrorMsg(null);
-    if (selectedAccount?.pin) {
-      setPinInput(selectedAccount.pin);
-    } else {
-      setPinInput("");
-      setConfirmNewPin("");
-    }
-  }, [selectedUserId, selectedAccount?.pin]);
+    fetchDbUsers();
+  }, []);
 
-  const handleLoginOrCreatePin = (e: React.FormEvent) => {
+  const matchedAccount = dbUsers.find(
+    (u) => u.username.toLowerCase() === username.trim().toLowerCase()
+  );
+
+  const mapDbUserToAppUser = (u: DbUserPublic, pinVal?: string): UserAccount => ({
+    id: `DB-${u.id}`,
+    username: u.username,
+    name: u.nama_lengkap,
+    role: u.role,
+    rt: u.rt ?? undefined,
+    phone: u.no_hp || "-",
+    active: u.active,
+    pin: pinVal || "terautentikasi-jwt",
+    privacyShowNameInLeaderboard: true,
+    createdAt: new Date().toISOString(),
+  });
+
+  const redirectByRole = (role: UserRole) => {
+    if (role === "WARGA") router.push("/warga");
+    else if (role === "ADMIN_RT") router.push("/rt");
+    else router.push("/rw");
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setInfoMsg(null);
+    setSubmitting(true);
 
-    if (!selectedAccount) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: username.trim(),
+          credential: credential.trim(),
+        }),
+      });
 
-    if (needsSelfPinCreation) {
-      if (!pinInput.trim()) {
-        setErrorMsg(
-          "Masukkan PIN baru Anda (bebas kombinasi karakter dan angka)."
-        );
-        return;
-      }
-      if (pinInput !== confirmNewPin) {
-        setErrorMsg("Konfirmasi PIN baru tidak cocok.");
-        return;
-      }
-      const res = createSelfPin(selectedAccount.id, pinInput);
+      const data = await res.json();
       if (!res.ok) {
-        setErrorMsg(res.message);
+        setErrorMsg(data.detail || "Gagal melakukan login.");
         return;
       }
-      if (selectedAccount.role === "WARGA") router.push("/warga");
-      else if (selectedAccount.role === "ADMIN_RT") router.push("/rt");
-      else router.push("/rw");
-      return;
-    }
 
-    const res = authenticateWithPin(selectedAccount.id, pinInput);
-    if (!res.ok) {
-      setErrorMsg(res.message);
-      return;
-    }
+      if (data.requires_pin_setup && data.setup_token) {
+        setPendingSetupToken(data.setup_token);
+        setPendingUser(data.user);
+        setInfoMsg(data.message);
+        setNewPin("");
+        setConfirmPin("");
+        return;
+      }
 
-    if (selectedAccount.role === "WARGA") router.push("/warga");
-    else if (selectedAccount.role === "ADMIN_RT") router.push("/rt");
-    else router.push("/rw");
+      if (data.access_token && data.user) {
+        const appUser = mapDbUserToAppUser(data.user, credential.trim());
+        setAuthenticatedSession(appUser, data.access_token);
+        redirectByRole(data.user.role);
+      }
+    } catch {
+      setErrorMsg(
+        "Tidak dapat terhubung ke server Backend FastAPI (http://localhost:8000). Pastikan backend sedang berjalan."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSetupPinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingSetupToken || !pendingUser) return;
+
+    setErrorMsg(null);
+    setSubmitting(true);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/setup-pin`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${pendingSetupToken}`,
+        },
+        body: JSON.stringify({
+          new_pin: newPin.trim(),
+          confirm_pin: confirmPin.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMsg(data.detail || "Gagal menyimpan PIN baru.");
+        return;
+      }
+
+      if (data.access_token && data.user) {
+        const appUser = mapDbUserToAppUser(data.user, newPin.trim());
+        setAuthenticatedSession(appUser, data.access_token);
+        redirectByRole(data.user.role);
+      }
+    } catch {
+      setErrorMsg("Gagal menghubungi server Backend saat menyimpan PIN.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -94,17 +189,17 @@ export default function LoginPage() {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-forest">
-                Masuk ke Jelantah Berkah
+                Masuk ke MinyaKu (Jelantah Berkah)
               </h1>
               <p className="text-xs sm:text-sm text-ink-muted">
-                Seluruh akun telah terdaftar di database (Tanpa registrasi
-                publik — FR-01)
+                Terhubung langsung ke tabel <code>public.users</code> Supabase +
+                Autentikasi JWT
               </p>
             </div>
           </div>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sage text-forest text-xs font-semibold">
             <ShieldCheck className="w-4 h-4" />
-            Autentikasi PIN per Role (FR-01)
+            JWT Auth + Supabase Live
           </span>
         </div>
 
@@ -115,87 +210,48 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLoginOrCreatePin} className="mt-6 space-y-5">
-          <div>
-            <label className="block text-xs sm:text-sm font-semibold text-ink mb-2">
-              1. Pilih Identitas Akun Terdaftar (Warga / 7 Admin RT / 1 Super
-              Admin RW)
-            </label>
-            <select
-              value={selectedAccount?.id || ""}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              className="w-full rounded-xl border border-line bg-cream/40 px-3.5 py-2.5 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-forest"
-            >
-              <optgroup label="Super Admin Tingkat RW (1 Akun)">
-                {users
-                  .filter((u) => u.role === "SUPER_ADMIN_RW")
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} (@{u.username}){" "}
-                      {!u.pin ? "— [Belum Buat PIN Sendiri]" : ""}
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="Relawan Admin RT (7 Akun: RT 01 - RT 07)">
-                {users
-                  .filter((u) => u.role === "ADMIN_RT")
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      [{u.rt}] {u.name} (@{u.username}){" "}
-                      {!u.pin ? "— [Belum Buat PIN Sendiri]" : ""}
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="Warga Terdaftar">
-                {users
-                  .filter((u) => u.role === "WARGA")
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      [{u.rt}] {u.name} (@{u.username}){" "}
-                      {!u.pin ? "— [Belum Buat PIN Sendiri]" : ""}
-                    </option>
-                  ))}
-              </optgroup>
-            </select>
+        {infoMsg && (
+          <div className="mt-5 p-3.5 rounded-xl bg-sage/50 border border-forest/30 text-forest text-xs sm:text-sm font-medium flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            {infoMsg}
           </div>
+        )}
 
-          {/* Kondisi FR-01: Jika Warga, Admin RT, atau Super Admin belum membuat PIN */}
-          {needsSelfPinCreation ? (
-            <div className="p-4 rounded-xl bg-sage/40 border border-forest/30 space-y-4">
+        {/* TAHAP 2: Form Buat PIN Baru (Khusus Warga & Relawan saat Login Pertama) */}
+        {pendingSetupToken && pendingUser ? (
+          <form onSubmit={handleSetupPinSubmit} className="mt-6 space-y-5">
+            <div className="p-4 rounded-xl bg-sage/40 border border-forest/30 space-y-3">
               <div className="flex items-start gap-2.5">
                 <KeyRound className="w-5 h-5 text-forest shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-forest">
-                    Buat PIN Pribadi Anda (FR-01)
+                  <h3 className="text-sm font-bold text-forest">
+                    Tahap 2: Buat PIN Pribadi Anda ({pendingUser.nama_lengkap})
                   </h3>
                   <p className="text-xs text-ink-muted mt-0.5">
-                    Akun <strong>{selectedAccount.name}</strong> telah terdaftar
-                    di database tetapi belum memiliki PIN. Sesuai ketentuan{" "}
-                    <strong>
-                      {selectedAccount.role === "WARGA"
-                        ? "Warga"
-                        : selectedAccount.role === "ADMIN_RT"
-                        ? `Admin ${selectedAccount.rt}`
-                        : "Super Admin RW"}
-                    </strong>
-                    , silakan buat PIN pribadi Anda sendiri (bebas kombinasi
-                    huruf, angka, atau karakter).
+                    Verifikasi login pertama untuk akun{" "}
+                    <strong>{pendingUser.username}</strong> (
+                    {pendingUser.role === "WARGA"
+                      ? `Warga ${pendingUser.rt}`
+                      : `Relawan ${pendingUser.rt}`}
+                    ) berhasil. Silakan buat PIN pribadi Anda untuk digunakan
+                    pada login berikutnya.
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <div>
                   <label className="block text-xs font-semibold text-ink mb-1">
-                    Buat PIN Baru <span className="text-red-600">*</span>
+                    PIN Baru <span className="text-red-600">*</span>
                   </label>
                   <input
-                    type="text"
+                    type="password"
                     required
-                    placeholder="Contoh: BerkahRT01#"
-                    value={pinInput}
-                    onChange={(e) => setPinInput(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-white px-3.5 py-2 text-sm text-ink"
+                    minLength={3}
+                    placeholder="Minimal 3 karakter/angka"
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
                   />
                 </div>
                 <div>
@@ -203,114 +259,214 @@ export default function LoginPage() {
                     Konfirmasi PIN Baru <span className="text-red-600">*</span>
                   </label>
                   <input
-                    type="text"
+                    type="password"
                     required
+                    minLength={3}
                     placeholder="Ulangi PIN baru..."
-                    value={confirmNewPin}
-                    onChange={(e) => setConfirmNewPin(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-white px-3.5 py-2 text-sm text-ink"
+                    value={confirmPin}
+                    onChange={(e) => setConfirmPin(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
                   />
                 </div>
               </div>
             </div>
-          ) : (
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingSetupToken(null);
+                  setPendingUser(null);
+                  setInfoMsg(null);
+                  setErrorMsg(null);
+                }}
+                className="px-4 py-2.5 rounded-xl border border-line text-ink-muted hover:text-ink text-xs font-semibold"
+              >
+                Kembali
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-60"
+              >
+                <UserCheck className="w-4 h-4" />
+                {submitting
+                  ? "Menyimpan PIN ke Supabase..."
+                  : "Simpan PIN & Masuk ke Aplikasi"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          /* TAHAP 1: Form Login Utama */
+          <form onSubmit={handleLoginSubmit} className="mt-6 space-y-5">
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs sm:text-sm font-semibold text-ink">
-                  2. Masukkan PIN Akun (Bebas Karakter & Angka)
-                </label>
-                {selectedAccount?.pin && (
-                  <span className="text-[11px] text-forest font-semibold">
-                    PIN Aktif Saat Ini: <code>{selectedAccount.pin}</code>
-                  </span>
-                )}
+              <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
+                1. Nomor Rumah / Username Akun
+              </label>
+              <div className="relative">
+                <Home className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Contoh: B713, ADMIN_RT02, atau SUPERADMIN_RW"
+                  className="w-full rounded-xl border border-line bg-white pl-10 pr-4 py-2.5 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-forest"
+                />
               </div>
+
+              {matchedAccount && (
+                <div className="mt-2 p-2.5 rounded-xl bg-cream/70 border border-line flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div>
+                    <span className="font-bold text-forest">
+                      {matchedAccount.nama_lengkap}
+                    </span>{" "}
+                    <span className="text-ink-muted">
+                      ({matchedAccount.role}
+                      {matchedAccount.rt ? ` — ${matchedAccount.rt}` : ""})
+                    </span>
+                  </div>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full font-semibold text-[11px] ${
+                      matchedAccount.role === "SUPER_ADMIN_RW"
+                        ? "bg-forest text-white"
+                        : matchedAccount.is_first_login
+                        ? "bg-amber-100 text-amber-900"
+                        : "bg-sage text-forest"
+                    }`}
+                  >
+                    {matchedAccount.role === "SUPER_ADMIN_RW"
+                      ? "Super Admin (Tanpa Setup PIN)"
+                      : matchedAccount.is_first_login
+                      ? "Login Pertama: Gunakan Nama Depan KK"
+                      : "Sudah Aktif: Gunakan PIN Pribadi"}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
+                2.{" "}
+                {matchedAccount?.role === "SUPER_ADMIN_RW"
+                  ? "Password Super Admin RW"
+                  : matchedAccount?.is_first_login
+                  ? "Password Awal (Nama Depan Kepala Keluarga)"
+                  : "PIN Pribadi / Password Awal"}
+              </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
                 <input
                   type="password"
-                  value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value)}
                   required
-                  placeholder="Masukkan PIN akun..."
+                  value={credential}
+                  onChange={(e) => setCredential(e.target.value)}
+                  placeholder={
+                    matchedAccount?.is_first_login
+                      ? "Masukkan Nama Depan KK (misal: Budi)"
+                      : "Masukkan PIN atau Password..."
+                  }
                   className="w-full rounded-xl border border-line bg-white pl-10 pr-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
                 />
               </div>
               <p className="text-[11px] text-ink-muted mt-1">
-                Untuk kemudahan simulasi prototipe, PIN akun yang dipilih sudah
-                terisi otomatis. Anda juga dapat memilih akun bertanda{" "}
-                <strong>[Belum Buat PIN Sendiri]</strong> untuk menguji alur
-                pembuatan PIN perdana.
+                {matchedAccount?.role === "SUPER_ADMIN_RW"
+                  ? "Super Admin RW langsung masuk tanpa perlu membuat PIN baru."
+                  : matchedAccount?.is_first_login
+                  ? "Karena akun ini baru pertama kali login, masukkan Nama Depan Kepala Keluarga (tidak peka huruf besar/kecil)."
+                  : "Masukkan PIN pribadi yang sudah Anda buat (atau Nama Depan KK jika belum pernah login)."}
               </p>
             </div>
-          )}
 
-          <button
-            type="submit"
-            className="w-full py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-sm"
-          >
-            <UserCheck className="w-4 h-4" />
-            {needsSelfPinCreation
-              ? "Simpan PIN Pribadi & Masuk ke Aplikasi"
-              : "Validasi PIN & Masuk Sesuai Peran"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-60"
+            >
+              <UserCheck className="w-4 h-4" />
+              {submitting
+                ? "Memverifikasi ke Server..."
+                : matchedAccount?.is_first_login &&
+                  matchedAccount?.role !== "SUPER_ADMIN_RW"
+                ? "Verifikasi Nama Depan KK & Lanjut Buat PIN"
+                : "Masuk dengan JWT"}
+            </button>
+          </form>
+        )}
+      </Card>
 
-        <div className="mt-6 pt-5 border-t border-line flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Panel Daftar Akun Live dari Tabel public.users Supabase untuk Kemudahan Uji Coba */}
+      <Card className="xl:col-span-5">
+        <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-xs font-semibold text-ink">
-              Mode Data Saat Ini:{" "}
-              <span className="text-forest">
-                {isIllustrativeMode
-                  ? "Data Contoh Ilustratif Berlabel"
-                  : "Data Kosong (Tanpa Data Fiktif)"}
-              </span>
-            </p>
+            <h2 className="text-sm font-bold text-forest">
+              Daftar Akun di Supabase (<code>public.users</code>)
+            </h2>
             <p className="text-[11px] text-ink-muted">
-              Jika Mode Data Kosong dipilih, akun warga contoh dihapus dan hanya
-              tersisa 1 Super Admin + 7 Admin RT.
+              Klik salah satu akun di bawah untuk mengisi Nomor Rumah/Username
+              secara cepat
             </p>
           </div>
           <button
             type="button"
-            onClick={() => toggleDataMode(!isIllustrativeMode)}
-            className="px-3.5 py-2 rounded-xl border border-forest text-forest hover:bg-sage/50 text-xs font-semibold shrink-0"
+            onClick={fetchDbUsers}
+            className="p-2 rounded-lg border border-line hover:bg-cream text-forest"
+            title="Muat ulang dari Supabase"
           >
-            {isIllustrativeMode
-              ? "Gunakan Seed Kosong Murni"
-              : "Gunakan Contoh Ilustratif"}
+            <RefreshCw
+              className={`w-4 h-4 ${loadingUsers ? "animate-spin" : ""}`}
+            />
           </button>
         </div>
-      </Card>
 
-      {/* Ringkasan Ketentuan PIN FR-01 */}
-      <Card className="xl:col-span-5">
-        <h2 className="text-sm font-bold text-forest mb-2">
-          Ketentuan Autentikasi PIN Berdasarkan Peran (FR-01 PRD)
-        </h2>
-        <div className="grid grid-cols-1 gap-3 text-xs">
-          <div className="p-3.5 rounded-xl bg-cream/60 border border-line">
-            <p className="font-bold text-ink">1. Warga</p>
-            <p className="text-ink-muted mt-1">
-              Warga membuat PIN sendiri untuk akun yang telah terdaftar di
-              database, digunakan untuk login, dan dapat diganti kapan saja di
-              halaman Profil.
-            </p>
-          </div>
-          <div className="p-3.5 rounded-xl bg-cream/60 border border-line">
-            <p className="font-bold text-ink">2. Admin RT (7 Akun)</p>
-            <p className="text-ink-muted mt-1">
-              Admin RT membuat PIN sendiri untuk akun yang telah terdaftar di
-              database, digunakan untuk login, dan dapat diganti di menu Profil.
-            </p>
-          </div>
-          <div className="p-3.5 rounded-xl bg-cream/60 border border-line">
-            <p className="font-bold text-ink">3. Super Admin RW (1 Akun)</p>
-            <p className="text-ink-muted mt-1">
-              Super Admin membuat PIN sendiri untuk akun yang telah terdaftar
-              dan digunakan untuk mengakses seluruh fitur pengelolaan RW.
-            </p>
-          </div>
+        <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 text-xs">
+          {dbUsers.map((u) => (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => {
+                setPendingSetupToken(null);
+                setPendingUser(null);
+                setErrorMsg(null);
+                setInfoMsg(null);
+                setUsername(u.username);
+                setCredential("");
+              }}
+              className={`w-full text-left p-3 rounded-xl border transition flex items-center justify-between gap-2 ${
+                username.toLowerCase() === u.username.toLowerCase()
+                  ? "bg-sage/50 border-forest"
+                  : "bg-cream/40 border-line hover:bg-cream"
+              }`}
+            >
+              <div>
+                <div className="font-bold text-ink flex items-center gap-1.5">
+                  <code>{u.username}</code>
+                  <span>— {u.nama_lengkap}</span>
+                </div>
+                <div className="text-[11px] text-ink-muted mt-0.5">
+                  Role: <strong>{u.role}</strong>{" "}
+                  {u.rt ? `(${u.rt})` : "(Tingkat RW)"} | Liter:{" "}
+                  <strong>{u.total_liter} L</strong> | Saldo:{" "}
+                  <strong>Rp {u.saldo_rupiah.toLocaleString("id-ID")}</strong>
+                </div>
+              </div>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${
+                  u.role === "SUPER_ADMIN_RW"
+                    ? "bg-forest text-white"
+                    : u.is_first_login
+                    ? "bg-amber-100 text-amber-900"
+                    : "bg-sage text-forest"
+                }`}
+              >
+                {u.role === "SUPER_ADMIN_RW"
+                  ? "Tetap"
+                  : u.is_first_login
+                  ? "Login Pertama"
+                  : "Sudah Punya PIN"}
+              </span>
+            </button>
+          ))}
         </div>
       </Card>
     </div>

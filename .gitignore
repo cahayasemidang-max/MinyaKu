@@ -60,3 +60,7 @@ Desktop.ini
 *.swp
 *.swo
 
+gemini-code-1794742050903.md
+frontend/package-lock.json
+backend/__pycache__
+backend/.env

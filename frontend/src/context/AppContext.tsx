@@ -45,6 +45,8 @@ export interface InventoryItemSummary {
 
 interface AppContextValue {
   currentUser: UserAccount;
+  jwtToken: string | null;
+  setAuthenticatedSession: (account: UserAccount, token: string) => void;
   setCurrentUserById: (userId: string) => void;
   isIllustrativeMode: boolean;
   toggleDataMode: (useIllustrative: boolean) => void;
@@ -201,6 +203,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isIllustrativeMode, setIsIllustrativeMode] = useState<boolean>(true);
   const [users, setUsers] = useState<UserAccount[]>(BASE_USERS);
   const [currentUserId, setCurrentUserId] = useState<string>("USR-W-01");
+  const [jwtToken, setJwtToken] = useState<string | null>(null);
   const [collectionPoints, setCollectionPoints] = useState<CollectionPoint[]>(
     ILLUSTRATIVE_COLLECTION_POINTS
   );
@@ -557,6 +560,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (found) {
       setCurrentUserId(found.id);
     }
+  };
+
+  const setAuthenticatedSession = (account: UserAccount, token: string) => {
+    setJwtToken(token);
+    try {
+      localStorage.setItem("minyaku_jwt_token", token);
+    } catch {
+      // ignore storage errors
+    }
+    setUsers((prev) => {
+      const exists = prev.some((u) => u.id === account.id || u.username === account.username);
+      if (exists) {
+        return prev.map((u) =>
+          u.id === account.id || u.username === account.username ? account : u
+        );
+      }
+      return [account, ...prev];
+    });
+    setCurrentUserId(account.id);
   };
 
   // FR-01: Validasi login menggunakan PIN masing-masing akun
@@ -1314,6 +1336,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider
       value={{
         currentUser,
+        jwtToken,
+        setAuthenticatedSession,
         setCurrentUserById,
         isIllustrativeMode,
         toggleDataMode,
