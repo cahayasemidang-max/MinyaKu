@@ -5,10 +5,14 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 
 export default function HomePage() {
-  const { currentUser } = useApp();
+  const { currentUser, jwtToken } = useApp();
   const router = useRouter();
 
   useEffect(() => {
+    if (!jwtToken) {
+      router.replace("/login");
+      return;
+    }
     if (currentUser.role === "WARGA") {
       router.replace("/warga");
     } else if (currentUser.role === "ADMIN_RT") {
@@ -16,12 +20,11 @@ export default function HomePage() {
     } else {
       router.replace("/rw");
     }
-  }, [currentUser, router]);
+  }, [currentUser, jwtToken, router]);
 
   return (
     <div className="p-8 text-center text-sm text-ink-muted">
-      Mengarahkan ke beranda sesuai peran pengguna...
+      Mengarahkan ke halaman login...
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
@@ -41,12 +41,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const {
     currentUser,
+    jwtToken,
+    hydrated,
+    logout,
     users,
     setCurrentUserById,
     isIllustrativeMode,
     toggleDataMode,
   } = useApp();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    if (hydrated && !jwtToken && pathname !== "/login") {
+      router.replace("/login");
+    }
+  }, [hydrated, jwtToken, pathname, router]);
 
   // Bab 7.1 PRD: Navigasi Warga (termasuk Dana Program)
   const wargaNav: NavItem[] = [
@@ -215,57 +224,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ? `Admin Relawan • ${currentUser.rt}`
       : "Super Admin RW (7 RT)";
 
+  if (pathname === "/login") {
+    return (
+      <div className="min-h-dvh w-full flex flex-col bg-cream text-ink overflow-x-hidden px-3 sm:px-6 lg:px-10 py-6">
+        <main className="w-full max-w-7xl mx-auto">{children}</main>
+      </div>
+    );
+  }
+
+  if (hydrated && !jwtToken) {
+    return (
+      <div className="min-h-dvh w-full flex items-center justify-center bg-cream text-ink-muted text-sm">
+        Mengarahkan ke halaman login...
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh lg:h-dvh lg:overflow-hidden w-full flex flex-col bg-cream text-ink overflow-x-hidden">
-      {/* Banner Prototipe & Switcher Peran (Full-Width) */}
-      <div className="w-full shrink-0 bg-forest-dark text-white text-xs border-b border-white/10 px-3 sm:px-6 lg:px-8 py-2">
-        <div className="w-full flex flex-col lg:flex-row lg:items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2 min-w-0">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-400 text-ink font-bold text-[11px] shrink-0">
-              <SlidersHorizontal className="w-3 h-3" />
-              {isIllustrativeMode
-                ? "MODE DATA ILUSTRATIF (PROTOTIPE)"
-                : "MODE DATA KOSONG (TANPA DATA FIKTIF)"}
-            </span>
-            <span className="text-cream/85 hidden sm:inline truncate">
-              Sesuai Aturan Bisnis #14 PRD: Data contoh diberi label ilustratif.
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-[11px] text-sage font-medium">
-              Simulasi Peran Aktif:
-            </label>
-            <select
-              aria-label="Pilih Peran Pengguna"
-              value={currentUser.id}
-              onChange={(e) => handleSwitchUser(e.target.value)}
-              className="max-w-full bg-forest text-white border border-sage/40 rounded-lg px-2.5 py-1 text-xs font-medium focus:outline-none"
-            >
-              {users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.role === "SUPER_ADMIN_RW"
-                    ? `[Super Admin RW] ${u.name}`
-                    : u.role === "ADMIN_RT"
-                    ? `[Admin ${u.rt}] ${u.name}`
-                    : `[Warga ${u.rt}] ${u.name}`}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="button"
-              onClick={() => toggleDataMode(!isIllustrativeMode)}
-              className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-medium transition shrink-0"
-            >
-              {isIllustrativeMode
-                ? "Ubah ke Seed Kosong"
-                : "Muat Contoh Ilustratif"}
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Top Header Bar (Full-Width) */}
       <header className="sticky top-0 z-30 w-full shrink-0 bg-white/95 backdrop-blur border-b border-line px-3 sm:px-6 lg:px-8 py-3">
         <div className="w-full flex items-center justify-between gap-3">
@@ -318,13 +294,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {roleBadgeLabel}
               </p>
             </div>
-            <Link
-              href="/login"
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                router.push("/login");
+              }}
               className="p-2 rounded-xl border border-line text-ink-muted hover:text-forest hover:bg-sage/40 transition"
-              title="Halaman Masuk / Ganti Akun"
+              title="Keluar / Halaman Login"
             >
               <LogOut className="w-4 h-4" />
-            </Link>
+            </button>
           </div>
         </div>
       </header>
@@ -421,14 +401,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="pt-4 border-t border-line">
-                <Link
-                  href="/login"
-                  onClick={() => setMobileDrawerOpen(false)}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileDrawerOpen(false);
+                    logout();
+                    router.push("/login");
+                  }}
                   className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-line text-xs font-semibold text-ink hover:bg-sage/40"
                 >
                   <LogOut className="w-4 h-4" />
-                  Halaman Login / Ganti Peran
-                </Link>
+                  Keluar / Ganti Akun
+                </button>
               </div>
             </div>
           </div>

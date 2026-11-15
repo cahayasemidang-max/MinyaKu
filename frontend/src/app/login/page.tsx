@@ -9,16 +9,26 @@ import {
   AlertCircle,
   CheckCircle2,
   Droplets,
+  Eye,
+  EyeOff,
+  HelpCircle,
   Home,
   KeyRound,
   Lock,
-  RefreshCw,
-  ShieldCheck,
   UserCheck,
 } from "lucide-react";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+const BOUND_ACCOUNT_STORAGE_KEY = "minyaku_bound_account";
+
+interface BoundAccountInfo {
+  username: string;
+  nama_lengkap: string;
+  role: UserRole;
+  rt?: RTCode | null;
+}
 
 interface DbUserPublic {
   id: number;
@@ -37,47 +47,60 @@ export default function LoginPage() {
   const { setAuthenticatedSession } = useApp();
   const router = useRouter();
 
-  const [dbUsers, setDbUsers] = useState<DbUserPublic[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState<boolean>(true);
-  const [username, setUsername] = useState<string>("B713");
+  const [boundAccount, setBoundAccount] = useState<BoundAccountInfo | null>(
+    null
+  );
+  const [username, setUsername] = useState<string>("");
   const [credential, setCredential] = useState<string>("");
+  const [showCredential, setShowCredential] = useState<boolean>(false);
 
-  // State khusus tahap 2 (Pembuatan PIN perdana setelah verifikasi Nama Depan KK)
+  // State khusus Tahap 2 (Set PIN 6 Digit ala Bank Jago saat pertama kali aktif)
   const [pendingSetupToken, setPendingSetupToken] = useState<string | null>(
     null
   );
   const [pendingUser, setPendingUser] = useState<DbUserPublic | null>(null);
   const [newPin, setNewPin] = useState<string>("");
   const [confirmPin, setConfirmPin] = useState<string>("");
+  const [showNewPin, setShowNewPin] = useState<boolean>(false);
 
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
 
-  const fetchDbUsers = async () => {
-    setLoadingUsers(true);
+  useEffect(() => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/users`);
-      if (res.ok) {
-        const data: DbUserPublic[] = await res.json();
-        setDbUsers(data);
+      const savedBound = localStorage.getItem(BOUND_ACCOUNT_STORAGE_KEY);
+      if (savedBound) {
+        const parsed: BoundAccountInfo = JSON.parse(savedBound);
+        if (parsed?.username) {
+          setBoundAccount(parsed);
+          setUsername(parsed.username);
+        }
       }
     } catch {
-      // Backend might not be running yet
-    } finally {
-      setLoadingUsers(false);
+      // ignore storage errors
+    }
+  }, []);
+
+  const saveBoundAccount = (user: DbUserPublic) => {
+    const info: BoundAccountInfo = {
+      username: user.username,
+      nama_lengkap: user.nama_lengkap,
+      role: user.role,
+      rt: user.rt,
+    };
+    setBoundAccount(info);
+    try {
+      localStorage.setItem(BOUND_ACCOUNT_STORAGE_KEY, JSON.stringify(info));
+    } catch {
+      // ignore storage errors
     }
   };
 
-  useEffect(() => {
-    fetchDbUsers();
-  }, []);
-
-  const matchedAccount = dbUsers.find(
-    (u) => u.username.toLowerCase() === username.trim().toLowerCase()
-  );
-
-  const mapDbUserToAppUser = (u: DbUserPublic, pinVal?: string): UserAccount => ({
+  const mapDbUserToAppUser = (
+    u: DbUserPublic,
+    pinVal?: string
+  ): UserAccount => ({
     id: `DB-${u.id}`,
     username: u.username,
     name: u.nama_lengkap,
@@ -102,22 +125,29 @@ export default function LoginPage() {
     setInfoMsg(null);
     setSubmitting(true);
 
+    const targetUsername = boundAccount
+      ? boundAccount.username
+      : username.trim();
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: username.trim(),
+          username: targetUsername,
           credential: credential.trim(),
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        setErrorMsg(data.detail || "Gagal melakukan login.");
+        setErrorMsg(
+          data.detail || "Nomor Rumah / Username atau Password/PIN tidak sesuai."
+        );
         return;
       }
 
+      // Jika Warga / Relawan baru pertama kali login (pakai Nama Depan KK) -> Lanjut Set PIN
       if (data.requires_pin_setup && data.setup_token) {
         setPendingSetupToken(data.setup_token);
         setPendingUser(data.user);
@@ -127,14 +157,16 @@ export default function LoginPage() {
         return;
       }
 
+      // Login berhasil -> Simpan sesi JWT & ikat perangkat ke akun ini
       if (data.access_token && data.user) {
+        saveBoundAccount(data.user);
         const appUser = mapDbUserToAppUser(data.user, credential.trim());
         setAuthenticatedSession(appUser, data.access_token);
         redirectByRole(data.user.role);
       }
     } catch {
       setErrorMsg(
-        "Tidak dapat terhubung ke server Backend FastAPI (http://localhost:8000). Pastikan backend sedang berjalan."
+        "Tidak dapat terhubung ke server. Pastikan layanan backend sedang berjalan."
       );
     } finally {
       setSubmitting(false);
@@ -146,6 +178,17 @@ export default function LoginPage() {
     if (!pendingSetupToken || !pendingUser) return;
 
     setErrorMsg(null);
+
+    if (!/^\d{6}$/.test(newPin.trim())) {
+      setErrorMsg("PIN harus terdiri dari tepat 6 digit angka (0-9).");
+      return;
+    }
+
+    if (newPin.trim() !== confirmPin.trim()) {
+      setErrorMsg("Konfirmasi PIN 6 digit tidak cocok.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -168,307 +211,226 @@ export default function LoginPage() {
       }
 
       if (data.access_token && data.user) {
+        saveBoundAccount(data.user);
         const appUser = mapDbUserToAppUser(data.user, newPin.trim());
         setAuthenticatedSession(appUser, data.access_token);
         redirectByRole(data.user.role);
       }
     } catch {
-      setErrorMsg("Gagal menghubungi server Backend saat menyimpan PIN.");
+      setErrorMsg("Gagal menghubungi server saat menyimpan PIN.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="w-full py-2 sm:py-4 grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-      <Card className="p-6 sm:p-8 xl:col-span-7">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-line">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-forest text-white flex items-center justify-center">
-              <Droplets className="w-6 h-6" />
+    <div className="min-h-[82dvh] w-full flex items-center justify-center py-6 px-2">
+      <div className="w-full max-w-md">
+        <Card className="p-6 sm:p-8 shadow-sm">
+          {/* Header Identitas Aplikasi */}
+          <div className="flex flex-col items-center text-center pb-6 border-b border-line">
+            <div className="w-14 h-14 rounded-2xl bg-forest text-white flex items-center justify-center shadow-sm mb-3">
+              <Droplets className="w-7 h-7" />
             </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-forest">
-                Masuk ke MinyaKu (Jelantah Berkah)
-              </h1>
-              <p className="text-xs sm:text-sm text-ink-muted">
-                Terhubung langsung ke tabel <code>public.users</code> Supabase +
-                Autentikasi JWT
-              </p>
+            <h1 className="text-xl sm:text-2xl font-bold text-forest">
+              Jelantah Berkah
+            </h1>
+            <p className="text-xs sm:text-sm text-ink-muted mt-1">
+              Platform Pengelolaan Minyak Jelantah & Program Sosial RW
+            </p>
+          </div>
+
+          {errorMsg && (
+            <div className="mt-5 p-3.5 rounded-xl bg-red-50 border border-red-300 text-red-900 text-xs sm:text-sm font-medium flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{errorMsg}</span>
             </div>
-          </div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sage text-forest text-xs font-semibold">
-            <ShieldCheck className="w-4 h-4" />
-            JWT Auth + Supabase Live
-          </span>
-        </div>
+          )}
 
-        {errorMsg && (
-          <div className="mt-5 p-3.5 rounded-xl bg-red-50 border border-red-300 text-red-900 text-xs sm:text-sm font-medium flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            {errorMsg}
-          </div>
-        )}
+          {infoMsg && (
+            <div className="mt-5 p-3.5 rounded-xl bg-sage/50 border border-forest/30 text-forest text-xs sm:text-sm font-medium flex items-start gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>{infoMsg}</span>
+            </div>
+          )}
 
-        {infoMsg && (
-          <div className="mt-5 p-3.5 rounded-xl bg-sage/50 border border-forest/30 text-forest text-xs sm:text-sm font-medium flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-            {infoMsg}
-          </div>
-        )}
-
-        {/* TAHAP 2: Form Buat PIN Baru (Khusus Warga & Relawan saat Login Pertama) */}
-        {pendingSetupToken && pendingUser ? (
-          <form onSubmit={handleSetupPinSubmit} className="mt-6 space-y-5">
-            <div className="p-4 rounded-xl bg-sage/40 border border-forest/30 space-y-3">
-              <div className="flex items-start gap-2.5">
+          {/* LAYAR 2: Set PIN 6 Digit (Khusus Warga & Relawan saat Pertama Kali Masuk) */}
+          {pendingSetupToken && pendingUser ? (
+            <form onSubmit={handleSetupPinSubmit} className="mt-6 space-y-4">
+              <div className="p-3.5 rounded-xl bg-sage/30 border border-forest/20 flex items-start gap-2.5">
                 <KeyRound className="w-5 h-5 text-forest shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="text-sm font-bold text-forest">
-                    Tahap 2: Buat PIN Pribadi Anda ({pendingUser.nama_lengkap})
-                  </h3>
+                  <h2 className="text-sm font-bold text-forest">
+                    Buat PIN 6 Digit Anda
+                  </h2>
                   <p className="text-xs text-ink-muted mt-0.5">
-                    Verifikasi login pertama untuk akun{" "}
-                    <strong>{pendingUser.username}</strong> (
-                    {pendingUser.role === "WARGA"
-                      ? `Warga ${pendingUser.rt}`
-                      : `Relawan ${pendingUser.rt}`}
-                    ) berhasil. Silakan buat PIN pribadi Anda untuk digunakan
-                    pada login berikutnya.
+                    Akun <strong>{pendingUser.nama_lengkap}</strong> (
+                    <code>{pendingUser.username}</code>) berhasil diverifikasi.
+                    Tetapkan 6 digit angka PIN untuk masuk ke aplikasi
+                    selanjutnya.
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <div>
-                  <label className="block text-xs font-semibold text-ink mb-1">
-                    PIN Baru <span className="text-red-600">*</span>
-                  </label>
+              <div>
+                <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
+                  PIN 6 Digit Baru
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
                   <input
-                    type="password"
+                    type={showNewPin ? "text" : "password"}
+                    inputMode="numeric"
+                    maxLength={6}
                     required
-                    minLength={3}
-                    placeholder="Minimal 3 karakter/angka"
                     value={newPin}
-                    onChange={(e) => setNewPin(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
+                    onChange={(e) =>
+                      setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
+                    placeholder="Masukkan 6 digit angka"
+                    className="w-full rounded-xl border border-line bg-white pl-10 pr-10 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPin((prev) => !prev)}
+                    className="absolute right-3 top-2.5 text-ink-muted hover:text-ink"
+                    tabIndex={-1}
+                  >
+                    {showNewPin ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-ink mb-1">
-                    Konfirmasi PIN Baru <span className="text-red-600">*</span>
-                  </label>
+              </div>
+
+              <div>
+                <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
+                  Konfirmasi PIN 6 Digit
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
                   <input
-                    type="password"
+                    type={showNewPin ? "text" : "password"}
+                    inputMode="numeric"
+                    maxLength={6}
                     required
-                    minLength={3}
-                    placeholder="Ulangi PIN baru..."
                     value={confirmPin}
-                    onChange={(e) => setConfirmPin(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
+                    onChange={(e) =>
+                      setConfirmPin(
+                        e.target.value.replace(/\D/g, "").slice(0, 6)
+                      )
+                    }
+                    placeholder="Ketik ulang 6 digit angka"
+                    className="w-full rounded-xl border border-line bg-white pl-10 pr-10 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setPendingSetupToken(null);
-                  setPendingUser(null);
-                  setInfoMsg(null);
-                  setErrorMsg(null);
-                }}
-                className="px-4 py-2.5 rounded-xl border border-line text-ink-muted hover:text-ink text-xs font-semibold"
-              >
-                Kembali
-              </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-60"
+                className="w-full py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-60"
               >
                 <UserCheck className="w-4 h-4" />
-                {submitting
-                  ? "Menyimpan PIN ke Supabase..."
-                  : "Simpan PIN & Masuk ke Aplikasi"}
+                {submitting ? "Menyimpan PIN..." : "Simpan PIN & Masuk"}
               </button>
-            </div>
-          </form>
-        ) : (
-          /* TAHAP 1: Form Login Utama */
-          <form onSubmit={handleLoginSubmit} className="mt-6 space-y-5">
-            <div>
-              <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
-                1. Nomor Rumah / Username Akun
-              </label>
-              <div className="relative">
-                <Home className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
-                <input
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Contoh: B713, ADMIN_RT02, atau SUPERADMIN_RW"
-                  className="w-full rounded-xl border border-line bg-white pl-10 pr-4 py-2.5 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-forest"
-                />
-              </div>
-
-              {matchedAccount && (
-                <div className="mt-2 p-2.5 rounded-xl bg-cream/70 border border-line flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div>
-                    <span className="font-bold text-forest">
-                      {matchedAccount.nama_lengkap}
-                    </span>{" "}
-                    <span className="text-ink-muted">
-                      ({matchedAccount.role}
-                      {matchedAccount.rt ? ` — ${matchedAccount.rt}` : ""})
-                    </span>
+            </form>
+          ) : (
+            /* LAYAR 1: Form Login Utama */
+            <form onSubmit={handleLoginSubmit} className="mt-6 space-y-4">
+              {boundAccount ? (
+                /* Tampilan jika perangkat sudah terikat ke 1 akun rumah (Gaya Bank Jago) */
+                <div className="p-4 rounded-xl bg-cream/70 border border-line text-center">
+                  <p className="text-xs text-ink-muted">Selamat datang kembali,</p>
+                  <p className="text-base font-bold text-forest mt-0.5">
+                    {boundAccount.nama_lengkap}
+                  </p>
+                  <p className="text-xs font-medium text-ink-muted mt-0.5">
+                    ID / Nomor Rumah: <strong>{boundAccount.username}</strong>
+                    {boundAccount.rt ? ` • ${boundAccount.rt}` : ""}
+                  </p>
+                </div>
+              ) : (
+                /* Tampilan jika pertama kali buka di perangkat ini */
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
+                    Nomor Rumah / Username
+                  </label>
+                  <div className="relative">
+                    <Home className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
+                    <input
+                      type="text"
+                      required
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Contoh: B713"
+                      className="w-full rounded-xl border border-line bg-white pl-10 pr-4 py-2.5 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-forest"
+                    />
                   </div>
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full font-semibold text-[11px] ${
-                      matchedAccount.role === "SUPER_ADMIN_RW"
-                        ? "bg-forest text-white"
-                        : matchedAccount.is_first_login
-                        ? "bg-amber-100 text-amber-900"
-                        : "bg-sage text-forest"
-                    }`}
-                  >
-                    {matchedAccount.role === "SUPER_ADMIN_RW"
-                      ? "Super Admin (Tanpa Setup PIN)"
-                      : matchedAccount.is_first_login
-                      ? "Login Pertama: Gunakan Nama Depan KK"
-                      : "Sudah Aktif: Gunakan PIN Pribadi"}
-                  </span>
                 </div>
               )}
-            </div>
 
-            <div>
-              <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
-                2.{" "}
-                {matchedAccount?.role === "SUPER_ADMIN_RW"
-                  ? "Password Super Admin RW"
-                  : matchedAccount?.is_first_login
-                  ? "Password Awal (Nama Depan Kepala Keluarga)"
-                  : "PIN Pribadi / Password Awal"}
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
-                <input
-                  type="password"
-                  required
-                  value={credential}
-                  onChange={(e) => setCredential(e.target.value)}
-                  placeholder={
-                    matchedAccount?.is_first_login
-                      ? "Masukkan Nama Depan KK (misal: Budi)"
-                      : "Masukkan PIN atau Password..."
-                  }
-                  className="w-full rounded-xl border border-line bg-white pl-10 pr-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
-                />
-              </div>
-              <p className="text-[11px] text-ink-muted mt-1">
-                {matchedAccount?.role === "SUPER_ADMIN_RW"
-                  ? "Super Admin RW langsung masuk tanpa perlu membuat PIN baru."
-                  : matchedAccount?.is_first_login
-                  ? "Karena akun ini baru pertama kali login, masukkan Nama Depan Kepala Keluarga (tidak peka huruf besar/kecil)."
-                  : "Masukkan PIN pribadi yang sudah Anda buat (atau Nama Depan KK jika belum pernah login)."}
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-60"
-            >
-              <UserCheck className="w-4 h-4" />
-              {submitting
-                ? "Memverifikasi ke Server..."
-                : matchedAccount?.is_first_login &&
-                  matchedAccount?.role !== "SUPER_ADMIN_RW"
-                ? "Verifikasi Nama Depan KK & Lanjut Buat PIN"
-                : "Masuk dengan JWT"}
-            </button>
-          </form>
-        )}
-      </Card>
-
-      {/* Panel Daftar Akun Live dari Tabel public.users Supabase untuk Kemudahan Uji Coba */}
-      <Card className="xl:col-span-5">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-sm font-bold text-forest">
-              Daftar Akun di Supabase (<code>public.users</code>)
-            </h2>
-            <p className="text-[11px] text-ink-muted">
-              Klik salah satu akun di bawah untuk mengisi Nomor Rumah/Username
-              secara cepat
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={fetchDbUsers}
-            className="p-2 rounded-lg border border-line hover:bg-cream text-forest"
-            title="Muat ulang dari Supabase"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${loadingUsers ? "animate-spin" : ""}`}
-            />
-          </button>
-        </div>
-
-        <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1 text-xs">
-          {dbUsers.map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              onClick={() => {
-                setPendingSetupToken(null);
-                setPendingUser(null);
-                setErrorMsg(null);
-                setInfoMsg(null);
-                setUsername(u.username);
-                setCredential("");
-              }}
-              className={`w-full text-left p-3 rounded-xl border transition flex items-center justify-between gap-2 ${
-                username.toLowerCase() === u.username.toLowerCase()
-                  ? "bg-sage/50 border-forest"
-                  : "bg-cream/40 border-line hover:bg-cream"
-              }`}
-            >
               <div>
-                <div className="font-bold text-ink flex items-center gap-1.5">
-                  <code>{u.username}</code>
-                  <span>— {u.nama_lengkap}</span>
+                <label className="block text-xs sm:text-sm font-semibold text-ink mb-1.5">
+                  {boundAccount ? "PIN Anda" : "PIN / Password"}
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-ink-muted absolute left-3.5 top-3" />
+                  <input
+                    type={showCredential ? "text" : "password"}
+                    required
+                    value={credential}
+                    onChange={(e) => setCredential(e.target.value)}
+                    placeholder={
+                      boundAccount
+                        ? "Masukkan 6 digit PIN Anda"
+                        : "Masukkan PIN atau Password awal"
+                    }
+                    className="w-full rounded-xl border border-line bg-white pl-10 pr-10 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCredential((prev) => !prev)}
+                    className="absolute right-3 top-2.5 text-ink-muted hover:text-ink"
+                    tabIndex={-1}
+                    aria-label="Tampilkan atau sembunyikan PIN/Password"
+                  >
+                    {showCredential ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
-                <div className="text-[11px] text-ink-muted mt-0.5">
-                  Role: <strong>{u.role}</strong>{" "}
-                  {u.rt ? `(${u.rt})` : "(Tingkat RW)"} | Liter:{" "}
-                  <strong>{u.total_liter} L</strong> | Saldo:{" "}
-                  <strong>Rp {u.saldo_rupiah.toLocaleString("id-ID")}</strong>
-                </div>
+                {!boundAccount && (
+                  <p className="text-[11px] text-ink-muted mt-1.5 leading-relaxed">
+                    Bagi pengguna yang baru pertama kali masuk, gunakan{" "}
+                    <strong>Nama Depan Kepala Keluarga</strong> sebagai password
+                    awal untuk membuat PIN.
+                  </p>
+                )}
               </div>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${
-                  u.role === "SUPER_ADMIN_RW"
-                    ? "bg-forest text-white"
-                    : u.is_first_login
-                    ? "bg-amber-100 text-amber-900"
-                    : "bg-sage text-forest"
-                }`}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-3 rounded-xl bg-forest hover:bg-forest-dark text-white font-semibold text-sm flex items-center justify-center gap-2 transition shadow-sm disabled:opacity-60"
               >
-                {u.role === "SUPER_ADMIN_RW"
-                  ? "Tetap"
-                  : u.is_first_login
-                  ? "Login Pertama"
-                  : "Sudah Punya PIN"}
-              </span>
-            </button>
-          ))}
-        </div>
-      </Card>
+                <UserCheck className="w-4 h-4" />
+                {submitting ? "Memproses..." : "Masuk"}
+              </button>
+            </form>
+          )}
+
+          {/* Informasi Bantuan Lupa PIN */}
+          <div className="mt-6 pt-4 border-t border-line flex items-center justify-center gap-1.5 text-center text-xs text-ink-muted">
+            <HelpCircle className="w-3.5 h-3.5 text-forest shrink-0" />
+            <span>Lupa PIN? Hubungi Admin RT atau Pengurus RW.</span>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -46,7 +46,9 @@ export interface InventoryItemSummary {
 interface AppContextValue {
   currentUser: UserAccount;
   jwtToken: string | null;
+  hydrated: boolean;
   setAuthenticatedSession: (account: UserAccount, token: string) => void;
+  logout: () => void;
   setCurrentUserById: (userId: string) => void;
   isIllustrativeMode: boolean;
   toggleDataMode: (useIllustrative: boolean) => void;
@@ -235,6 +237,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
+      const savedToken = localStorage.getItem("minyaku_jwt_token");
+      if (savedToken) {
+        setJwtToken(savedToken);
+      }
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -579,6 +585,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return [account, ...prev];
     });
     setCurrentUserId(account.id);
+  };
+
+  const logout = () => {
+    setJwtToken(null);
+    try {
+      localStorage.removeItem("minyaku_jwt_token");
+    } catch {
+      // ignore storage errors
+    }
   };
 
   // FR-01: Validasi login menggunakan PIN masing-masing akun
@@ -1337,7 +1352,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         currentUser,
         jwtToken,
+        hydrated,
         setAuthenticatedSession,
+        logout,
         setCurrentUserById,
         isIllustrativeMode,
         toggleDataMode,
