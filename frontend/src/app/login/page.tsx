@@ -208,7 +208,7 @@ export default function LoginPage() {
         }
       } catch {
         setErrorMsg(
-          "Tidak dapat terhubung ke server. Pastikan layanan backend sedang berjalan."
+          `Tidak dapat terhubung ke server (${API_BASE_URL}). Pastikan layanan backend sedang berjalan.`
         );
       } finally {
         setSubmitting(false);
