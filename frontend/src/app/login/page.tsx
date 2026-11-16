@@ -19,8 +19,9 @@ import {
   UserCheck,
 } from "lucide-react";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+).replace(/\/+$/, "");
 
 const BOUND_ACCOUNT_STORAGE_KEY = "minyaku_bound_account";
 
