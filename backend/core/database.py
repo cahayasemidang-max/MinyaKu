@@ -1,34 +1,38 @@
+import os
 import socket
 from typing import Optional
 
-import dns.resolver
 import httpx
 from fastapi import HTTPException, status
 
 from core.config import SUPABASE_KEY
 
 # Fallback DNS otomatis ke Cloudflare (1.1.1.1) & Google (8.8.8.8)
-# jika DNS ISP lokal mengalami gangguan sementara ([Errno 11001] getaddrinfo failed)
-_orig_getaddrinfo = socket.getaddrinfo
-
-
-def _resilient_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+# khusus untuk Windows lokal jika DNS ISP mengalami gangguan ([Errno 11001] getaddrinfo failed)
+if os.name == "nt":
     try:
-        return _orig_getaddrinfo(host, port, family, type, proto, flags)
-    except socket.gaierror:
-        try:
-            resolver = dns.resolver.Resolver(configure=False)
-            resolver.nameservers = ["1.1.1.1", "8.8.8.8"]
-            resolver.timeout = 3.0
-            resolver.lifetime = 5.0
-            answers = resolver.resolve(str(host), "A")
-            ip = answers[0].to_text()
-            return _orig_getaddrinfo(ip, port, socket.AF_INET, type, proto, flags)
-        except Exception:
-            raise
+        import dns.resolver
 
+        _orig_getaddrinfo = socket.getaddrinfo
 
-socket.getaddrinfo = _resilient_getaddrinfo
+        def _resilient_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+            try:
+                return _orig_getaddrinfo(host, port, family, type, proto, flags)
+            except socket.gaierror:
+                try:
+                    resolver = dns.resolver.Resolver(configure=False)
+                    resolver.nameservers = ["1.1.1.1", "8.8.8.8"]
+                    resolver.timeout = 3.0
+                    resolver.lifetime = 5.0
+                    answers = resolver.resolve(str(host), "A")
+                    ip = answers[0].to_text()
+                    return _orig_getaddrinfo(ip, port, socket.AF_INET, type, proto, flags)
+                except Exception:
+                    raise
+
+        socket.getaddrinfo = _resilient_getaddrinfo
+    except ImportError:
+        pass
 
 
 def supabase_headers(prefer: Optional[str] = None) -> dict:

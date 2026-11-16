@@ -27,6 +27,11 @@ app.add_middleware(
 )
 
 
+@app.get("/", tags=["Health"])
+async def root():
+    return {"status": "ok", "service": "MinyaKu Modular API", "docs": "/docs"}
+
+
 @app.get("/api/health", tags=["Health"])
 async def health_check():
     return {"status": "ok", "service": "MinyaKu Modular API"}
