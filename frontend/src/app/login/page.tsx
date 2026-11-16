@@ -19,9 +19,15 @@ import {
   UserCheck,
 } from "lucide-react";
 
-const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-).replace(/\/+$/, "");
+const rawApiUrl =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+const API_BASE_URL = rawApiUrl
+  .replace(/\/+$/, "")
+  .replace(
+    /^https:\/\/minya-ku-myua-[a-z0-9]+-minya-ku\.vercel\.app$/i,
+    "https://minya-ku-myua.vercel.app"
+  );
 
 const BOUND_ACCOUNT_STORAGE_KEY = "minyaku_bound_account";
 
